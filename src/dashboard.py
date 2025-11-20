@@ -3,108 +3,99 @@ import pandas as pd
 import requests
 import plotly.graph_objects as go
 import os
-import matplotlib.pyplot as plt
+from datetime import datetime
 
-from main import TIMESTEPS
+# Import the data collection function from our other script
+from data_collection import collect_telemetry_data
 
+# --- Configuration ---
 API_URL = "http://127.0.0.1:8000/predict"
-TELEMETRY_DATA_PATH = os.path.join('data', 'telemetry_data.csv')
+TIMESTEPS = 10  # Must match the model's training
 
-def plot_telemetry_with_anomalies(df, is_anomaly_list, features_to_plot):
+
+def plot_results(df, results, title):
+    """Helper function to create a plot for a given set of features."""
+    features_to_plot = df.columns
     fig = go.Figure()
-    num_plots = len(features_to_plot)
-    fig, axes = plt.subplots(num_plots, 1, figsize=(15, 2 * num_plots), sharex=True)
-    if num_plots == 1:
-        axes = [axes]
 
-    anomaly_series = pd.Series(False, index=df.index)
-    prediction_indices = df.index[TIMESTEPS - 1:len(is_anomaly_list) + TIMESTEPS - 1]
-    anomaly_series.loc[prediction_indices[is_anomaly_list]] = True
+    anomaly_indices = [i + TIMESTEPS - 1 for i, is_anomaly in enumerate(results.get("is_anomaly", [])) if is_anomaly]
 
-    for i, feature in enumerate(features_to_plot):
-        axes[i].plot(df.index, df[feature], label='Normal', color='cornflowerblue', zorder=1)
+    for feature in features_to_plot:
+        # Normal data trace
+        fig.add_trace(go.Scatter(x=df.index, y=df[feature], mode='lines', name=feature))
+        # Anomaly markers
+        fig.add_trace(go.Scatter(
+            x=anomaly_indices, y=df.loc[anomaly_indices, feature],
+            mode='markers', name=f'{feature} Anomaly',
+            marker=dict(color='red', size=8, symbol='x'),
+            showlegend=False
+        ))
 
-        animalous_data = df[anomaly_series]
-        axes[i].scatter(animalous_data.index, animalous_data[feature], color='crimson', label='Anomaly', zorder=2, s=20)
+    fig.update_layout(title=title, xaxis_title="Time Step", yaxis_title="Value", height=400)
+    st.plotly_chart(fig, use_container_width=True)
 
-        axes[i].set_ylabel(feature)
-        if i == 0:
-            axes[i].legend()
 
-    axes[-1].set_xlabel('Time step')
-    plt.tight_layout()
-    st.pyplot(fig)
-
+# --- UI Layout ---
 st.set_page_config(layout="wide")
 st.title("Apex Sentinel")
+st.write("Select a session to analyze a driver's fastest lap against the baseline AI model.")
 
-st.write("""
-This dashboard simulates real-time analysis of F1 car telemetry.
-Click the button below to fetch the latest lap data and run it through our AI Model to detect anomalies
-""")
+# --- User Input Section ---
+st.header("1. Select Data for Analysis")
 
-if st.button("Analyse latest lap data"):
-    if not os.path.exists(TELEMETRY_DATA_PATH):
-        st.error(f"Data file not found at {TELEMETRY_DATA_PATH}. Please run `python src/data_collection.py` first.")
+SESSION_OPTIONS = {
+    'Race': 'R', 'Qualifying': 'Q', 'Sprint': 'S',
+    'FP1': 'FP1', 'FP2': 'FP2', 'FP3': 'FP3'
+}
+
+col1, col2, col3, col4 = st.columns(4)
+with col1:
+    year = st.number_input("Year", min_value=2018, max_value=datetime.now().year, value=2023)
+with col2:
+    grand_prix = st.text_input("Grand Prix Name", value="Bahrain")
+with col3:
+    session_key = st.selectbox("Session Type", options=list(SESSION_OPTIONS.keys()), index=0)
+    session_type = SESSION_OPTIONS[session_key]
+with col4:
+    driver = st.text_input("Driver Abbreviation", value="PER", help="e.g., VER, PER, HAM, LEC")
+
+if st.button("Analyze Lap Data"):
+    with st.spinner(f"Downloading data for {driver} at the {year} {grand_prix} GP..."):
+        df, error_message = collect_telemetry_data(year, grand_prix, session_type, driver)
+
+    if error_message:
+        st.error(error_message)
     else:
-        df = pd.read_csv(TELEMETRY_DATA_PATH)
+        st.success(f"Successfully downloaded data for {driver}'s fastest lap.")
+        st.header("2. Analysis Results")
 
         features = ['Speed', 'RPM', 'Throttle', 'Brake', 'nGear', 'DRS']
         telemetry_to_send = df[features]
-
         if telemetry_to_send['Brake'].dtype == 'bool':
             telemetry_to_send['Brake'] = telemetry_to_send['Brake'].astype(int)
 
-        st.info("Sending data to the Anomaly Detection API...")
+        with st.spinner("Sending data to the AI model for analysis..."):
+            try:
+                response = requests.post(API_URL, json=telemetry_to_send.to_dict(orient='list'))
+                response.raise_for_status()
+                results = response.json()
+                st.success("Analysis complete!")
 
-        try:
-            # 2. Send data to the API
-            response = requests.post(API_URL, json=telemetry_to_send.to_dict(orient='list'))
-            response.raise_for_status()  # Raise an exception for bad status codes
+                # --- Visualization ---
+                st.subheader("Telemetry Plots with Anomalies Highlighted")
 
-            results = response.json()
-            st.success("Analysis complete! Plotting results...")
+                # Plot 1: RPM
+                rpm_df = telemetry_to_send[['RPM']]
+                plot_results(rpm_df, results, "RPM Analysis")
 
-            # 3. Display results
-            st.subheader("Analysis Results")
+                # Plot 2: Other Telemetry
+                other_df = telemetry_to_send.drop(columns=['RPM'])
+                plot_results(other_df, results, "Other Telemetry Analysis (Speed, Throttle, etc.)")
 
-            # Use Plotly for interactive charts
-            fig = go.Figure()
+                num_anomalies = sum(results.get("is_anomaly", []))
+                st.metric(label="Total Anomalous Time Steps Detected", value=num_anomalies)
 
-            # The API returns anomaly flags for each sequence. We need to align this with the original data.
-            # The prediction for a sequence corresponds to the end of that sequence.
-            TIMESTEPS = 10  # This must match the model's setting
-            anomaly_indices = [i + TIMESTEPS - 1 for i, is_anomaly in enumerate(results.get("is_anomaly", [])) if
-                               is_anomaly]
-
-            for feature in features:
-                fig.add_trace(go.Scatter(
-                    x=df.index,
-                    y=df[feature],
-                    mode='lines',
-                    name=feature,
-                    legendgroup=feature
-                ))
-                # Add anomaly markers
-                fig.add_trace(go.Scatter(
-                    x=anomaly_indices,
-                    y=df.loc[anomaly_indices, feature],
-                    mode='markers',
-                    name=f'{feature} Anomaly',
-                    marker=dict(color='red', size=8, symbol='x'),
-                    legendgroup=feature,
-                    showlegend=False
-                ))
-
-            fig.update_layout(
-                title="Telemetry Data with Detected Anomalies",
-                xaxis_title="Time Step",
-                yaxis_title="Value",
-                height=600
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        except requests.exceptions.RequestException as e:
-            st.error(f"Could not connect to the API at {API_URL}. Is the backend running? \n\nError: {e}")
-        except Exception as e:
-            st.error(f"An unexpected error occurred: {e}")
+            except requests.exceptions.RequestException as e:
+                st.error(f"Could not connect to the API at {API_URL}. Is the backend running? \n\nError: {e}")
+            except Exception as e:
+                st.error(f"An unexpected error occurred: {e}")
