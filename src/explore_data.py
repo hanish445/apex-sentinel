@@ -72,6 +72,7 @@ def explore_and_preprocess_data():
     scaled_df.to_csv(scaled_data_path, index=False)
     print(f"\nScaled data saved to {scaled_data_path}")
 
+    os.makedirs('models', exist_ok=True)
     scaler_path = os.path.join('models', 'scaler.pkl')
     with open(scaler_path, 'wb') as f:
         pickle.dump(scaler, f)
