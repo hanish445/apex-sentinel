@@ -1,5 +1,6 @@
 data/
 reports/
+src/models/anomaly_detector.keras
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

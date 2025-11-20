@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 from sklearn.preprocessing import MinMaxScaler
+import pickle
 
 def explore_and_preprocess_data():
     """
@@ -70,6 +71,11 @@ def explore_and_preprocess_data():
     scaled_data_path = os.path.join('data', 'scaled_telemetry_data.csv')
     scaled_df.to_csv(scaled_data_path, index=False)
     print(f"\nScaled data saved to {scaled_data_path}")
+
+    scaler_path = os.path.join('models', 'scaler.pkl')
+    with open(scaler_path, 'wb') as f:
+        pickle.dump(scaler, f)
+    print(f"Scaler saved to {scaler_path}")
     
     print("\n--- Data Exploration and Preprocessing Finished ---")
 
