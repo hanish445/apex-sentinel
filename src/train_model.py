@@ -78,6 +78,16 @@ def main():
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
     model.save(MODEL_PATH)
     print(f"\nModel saved successfully to {MODEL_PATH}")
+
+    # 6. Calculate and save dynamic threshold
+    print("\nCalculating dynamic anomaly threshold...")
+
+    reconstructed_sequences = model.predict(sequences)
+    train_mae_loss = np.mean(np.abs(reconstructed_sequences - sequences), axis=(1, 2))
+
+    threshold = np.mean(train_mae_loss) + 3 * np.std(train_mae_loss)
+
+    print(f"Calculated threshold: {threshold}")
     
     print("\n--- Model Training Finished ---")
 
