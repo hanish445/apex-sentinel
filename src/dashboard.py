@@ -2,8 +2,10 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.graph_objects as go
+import plotly.express as px
 import os
 import time
+import json
 from datetime import datetime
 
 from data_collection import collect_telemetry_data
@@ -16,7 +18,7 @@ DEFAULT_PLAYBACK_DELAY = 0.2  # seconds between steps
 st.set_page_config(layout="wide")
 st.title("Apex Sentinel")
 
-st.write("Select session and driver, download the lap, then use 'Simulate Live Feed' to stream telemetry through the model.")
+st.write("Select session and driver, download the lap, then use 'Simulate Live Feed' to stream telemetry through the model. Use 'Run Explainability (Batch)' to compute per-feature explanations for the whole lap.")
 
 # UI: Data selection
 SESSION_OPTIONS = {
@@ -45,6 +47,7 @@ download_col = st.empty()
 status_col = st.empty()
 plots_col = st.empty()
 controls_col = st.empty()
+explain_col = st.empty()
 
 # Variables stored in session_state across reruns
 if "telemetry_df" not in st.session_state:
@@ -55,6 +58,8 @@ if "is_running" not in st.session_state:
     st.session_state.is_running = False
 if "current_step" not in st.session_state:
     st.session_state.current_step = TIMESTEPS - 1
+if "explain_results" not in st.session_state:
+    st.session_state.explain_results = None
 
 def download_and_prepare():
     with st.spinner(f"Downloading data for {driver} at the {year} {grand_prix} GP..."):
@@ -76,6 +81,7 @@ def download_and_prepare():
         st.session_state.telemetry_df['Brake'] = st.session_state.telemetry_df['Brake'].astype(int)
     st.session_state.anomaly_indices = []
     st.session_state.current_step = TIMESTEPS - 1
+    st.session_state.explain_results = None
     status_col.success("Telemetry downloaded and ready.")
     return True
 
@@ -96,6 +102,33 @@ def send_window_and_check_anomaly(window_df):
     except Exception as e:
         status_col.error(f"API request failed: {e}")
         return False, None, None
+
+def run_explainability():
+    """
+    Sends the entire telemetry DataFrame to the API to retrieve per-sequence and per-feature explanations.
+    Stores the API response in st.session_state.explain_results for UI inspection.
+    """
+    df = st.session_state.telemetry_df
+    if df is None:
+        status_col.error("No telemetry loaded. Download first.")
+        return False
+    features = ['Speed', 'RPM', 'Throttle', 'Brake', 'nGear', 'DRS']
+    payload = df[features].to_dict(orient='list')
+    try:
+        with st.spinner("Computing explainability for the full lap (this sends the entire lap to the API)..."):
+            resp = requests.post(API_URL, json=payload, timeout=30)
+            resp.raise_for_status()
+            results = resp.json()
+            if "error" in results:
+                status_col.error(f"API error: {results['error']}")
+                return False
+            # Store results
+            st.session_state.explain_results = results
+            status_col.success("Explainability results stored.")
+            return True
+    except Exception as e:
+        status_col.error(f"Explainability request failed: {e}")
+        return False
 
 def build_plots(upto_index):
     """
@@ -124,8 +157,8 @@ def build_plots(upto_index):
 
     return rpm_fig, other_fig
 
-# Buttons
-col_a, col_b, col_c = download_col.columns(3)
+# Buttons (now with an extra column for explainability)
+col_a, col_b, col_c, col_d = download_col.columns(4)
 with col_a:
     if st.button("Download Lap Data"):
         ok = download_and_prepare()
@@ -143,7 +176,15 @@ with col_c:
         st.session_state.telemetry_df = None
         st.session_state.anomaly_indices = []
         st.session_state.current_step = TIMESTEPS - 1
+        st.session_state.explain_results = None
         status_col.info("Stopped and reset.")
+with col_d:
+    if st.button("Run Explainability (Batch)"):
+        # Sends the full lap to the API and stores detailed explanation results
+        if st.session_state.telemetry_df is None:
+            status_col.error("No telemetry loaded. Download first.")
+        else:
+            run_explainability()
 
 # Main simulation loop (runs while is_running)
 if st.session_state.telemetry_df is not None:
@@ -199,3 +240,69 @@ if st.session_state.telemetry_df is not None:
         status_col.success("Simulation finished.")
 else:
     status_col.info("Download a lap to begin simulation.")
+
+# Explainability UI (appears when we have stored explain_results)
+if st.session_state.explain_results:
+    results = st.session_state.explain_results
+    # Basic summary
+    seq_end_indices = results.get("sequence_end_indices", [])
+    reconstruction_error = results.get("reconstruction_error", [])
+    is_anomaly = results.get("is_anomaly", [])
+    threshold = results.get("threshold", None)
+    feature_errors = results.get("feature_errors", [])
+    top_features = results.get("top_features", [])
+
+    num_anomalies = sum(is_anomaly)
+    explain_col.header("Explainability Results (Batch)")
+    explain_col.metric("Total Anomalous Sequences Detected", num_anomalies)
+    if threshold is not None:
+        explain_col.write(f"Threshold used: {threshold:.6f}")
+
+    if num_anomalies == 0:
+        explain_col.info("No anomalies detected for this lap (batch analysis).")
+    else:
+        explain_col.subheader("Anomaly Explanations")
+        anomaly_sequences = [i for i, flag in enumerate(is_anomaly) if flag]
+        # Selection widget for anomaly to inspect
+        selected_idx = explain_col.selectbox(
+            "Choose anomaly (sequence index)",
+            options=anomaly_sequences,
+            format_func=lambda i: f"Seq {i} (end idx={seq_end_indices[i]})"
+        )
+
+        # Show top contributing features bar chart
+        chosen_top = top_features[selected_idx]  # list of (feature, error)
+        if chosen_top:
+            top_df = pd.DataFrame(chosen_top, columns=["feature", "error"])
+            top_fig = px.bar(top_df, x="feature", y="error", title=f"Top contributing features for sequence {selected_idx}")
+            explain_col.plotly_chart(top_fig, use_container_width=True)
+        else:
+            explain_col.write("No top feature data available for this sequence.")
+
+        # Show heatmap of per-sequence per-feature errors (rows = sequences, cols = features)
+        if feature_errors:
+            err_matrix = pd.DataFrame(feature_errors)
+            # x axis: sequence indices, y axis: features
+            heat_fig = px.imshow(err_matrix.T, labels=dict(x="Sequence Index", y="Feature", color="Mean MAE"), x=[f"seq_{i}" for i in range(err_matrix.shape[0])], y=err_matrix.columns, aspect="auto", title="Per-sequence per-feature reconstruction error (mean over timesteps)")
+            explain_col.plotly_chart(heat_fig, use_container_width=True)
+        else:
+            explain_col.write("No per-feature error matrix available.")
+
+        # Show raw telemetry window around the selected anomaly end index
+        end_idx = seq_end_indices[selected_idx]
+        window_start = max(0, end_idx - TIMESTEPS - 5)
+        window_end = min(len(st.session_state.telemetry_df) - 1, end_idx + 5)
+        explain_col.write(f"Raw telemetry around anomaly (rows {window_start} to {window_end})")
+        explain_col.dataframe(st.session_state.telemetry_df.iloc[window_start:window_end+1].reset_index(drop=True))
+
+        # Download JSON report for the selected anomaly
+        if explain_col.button("Download anomaly report (JSON)"):
+            report = {
+                "sequence_index": selected_idx,
+                "end_index": end_idx,
+                "threshold": threshold,
+                "reconstruction_error": reconstruction_error[selected_idx] if selected_idx < len(reconstruction_error) else None,
+                "top_features": top_features[selected_idx] if selected_idx < len(top_features) else None,
+                "feature_errors": feature_errors[selected_idx] if selected_idx < len(feature_errors) else None
+            }
+            explain_col.download_button("Download JSON", data=json.dumps(report, indent=2), file_name=f"anomaly_seq_{selected_idx}.json", mime="application/json")
