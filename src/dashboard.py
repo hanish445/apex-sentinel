@@ -9,6 +9,8 @@ import json
 from datetime import datetime
 
 from data_collection import collect_telemetry_data
+# Import the new analysis functions
+from anomaly_analysis import generate_anomaly_explanation_text, create_top_features_chart
 
 # Configuration
 API_URL = "http://127.0.0.1:8000/predict"
@@ -18,7 +20,8 @@ DEFAULT_PLAYBACK_DELAY = 0.2  # seconds between steps
 st.set_page_config(layout="wide")
 st.title("Apex Sentinel")
 
-st.write("Select session and driver, download the lap, then use 'Simulate Live Feed' to stream telemetry through the model. Use 'Run Explainability (Batch)' to compute per-feature explanations for the whole lap.")
+st.write(
+    "Select session and driver, download the lap, then use 'Simulate Live Feed' to stream telemetry through the model. Use 'Run Explainability (Batch)' to compute per-feature explanations for the whole lap.")
 
 # UI: Data selection
 SESSION_OPTIONS = {
@@ -39,8 +42,10 @@ with col4:
 
 # Playback controls
 st.sidebar.header("Simulation Controls")
-playback_delay = st.sidebar.slider("Playback delay (s)", min_value=0.05, max_value=2.0, value=DEFAULT_PLAYBACK_DELAY, step=0.05)
+playback_delay = st.sidebar.slider("Playback delay (s)", min_value=0.05, max_value=2.0, value=DEFAULT_PLAYBACK_DELAY,
+                                   step=0.05)
 auto_start = st.sidebar.checkbox("Auto start after download", value=False)
+st.sidebar.info("Detected anomalies will be logged in the 'Explainability Results' section after a batch run.")
 
 # Placeholders
 download_col = st.empty()
@@ -60,6 +65,7 @@ if "current_step" not in st.session_state:
     st.session_state.current_step = TIMESTEPS - 1
 if "explain_results" not in st.session_state:
     st.session_state.explain_results = None
+
 
 def download_and_prepare():
     with st.spinner(f"Downloading data for {driver} at the {year} {grand_prix} GP..."):
@@ -85,6 +91,7 @@ def download_and_prepare():
     status_col.success("Telemetry downloaded and ready.")
     return True
 
+
 def send_window_and_check_anomaly(window_df):
     """
     Sends a window_df (DataFrame with TIMESTEPS rows) to the API and returns boolean is_anomaly, reconstruction_error, threshold.
@@ -102,6 +109,7 @@ def send_window_and_check_anomaly(window_df):
     except Exception as e:
         status_col.error(f"API request failed: {e}")
         return False, None, None
+
 
 def run_explainability():
     """
@@ -130,32 +138,46 @@ def run_explainability():
         status_col.error(f"Explainability request failed: {e}")
         return False
 
+
 def build_plots(upto_index):
     """
     Build two Plotly figures: RPM only, and other channels.
     Mark anomalies from session_state.anomaly_indices (they correspond to indices in the original df).
+    Includes units on the y-axis.
     """
     df = st.session_state.telemetry_df
     features_other = ['Speed', 'Throttle', 'Brake', 'nGear', 'DRS']
+
+    # Define units for plot axes
+    feature_units = {
+        'Speed': 'km/h', 'RPM': 'RPM', 'Throttle': '%',
+        'Brake': 'On/Off', 'nGear': 'Gear', 'DRS': 'State'
+    }
+
     # RPM plot
     rpm_fig = go.Figure()
-    rpm_fig.add_trace(go.Scatter(x=df.index[:upto_index+1], y=df['RPM'][:upto_index+1], mode='lines', name='RPM'))
+    rpm_fig.add_trace(go.Scatter(x=df.index[:upto_index + 1], y=df['RPM'][:upto_index + 1], mode='lines', name='RPM'))
     anomaly_points = [i for i in st.session_state.anomaly_indices if i <= upto_index]
     if anomaly_points:
-        rpm_fig.add_trace(go.Scatter(x=anomaly_points, y=df.loc[anomaly_points, 'RPM'], mode='markers', marker=dict(color='red', size=8, symbol='x'), name='Anomaly'))
-    rpm_fig.update_layout(title="RPM", xaxis_title="Time Step", yaxis_title="RPM", height=300)
+        rpm_fig.add_trace(go.Scatter(x=anomaly_points, y=df.loc[anomaly_points, 'RPM'], mode='markers',
+                                     marker=dict(color='red', size=8, symbol='x'), name='Anomaly'))
+    rpm_fig.update_layout(title="Engine RPM", xaxis_title="Time Step", yaxis_title=f"RPM ({feature_units['RPM']})",
+                          height=300)
 
     # Other telemetry plot
     other_fig = go.Figure()
     for feat in features_other:
-        other_fig.add_trace(go.Scatter(x=df.index[:upto_index+1], y=df[feat][:upto_index+1], mode='lines', name=feat))
+        other_fig.add_trace(go.Scatter(x=df.index[:upto_index + 1], y=df[feat][:upto_index + 1], mode='lines',
+                                       name=f"{feat} ({feature_units.get(feat, '')})"))
     if anomaly_points:
-        # For each feature, overlay anomaly markers
         for feat in features_other:
-            other_fig.add_trace(go.Scatter(x=anomaly_points, y=df.loc[anomaly_points, feat], mode='markers', marker=dict(color='red', size=8, symbol='x'), name=f'{feat} Anom', showlegend=False))
-    other_fig.update_layout(title="Other Telemetry (Speed, Throttle, Brake, nGear, DRS)", xaxis_title="Time Step", height=350)
+            other_fig.add_trace(go.Scatter(x=anomaly_points, y=df.loc[anomaly_points, feat], mode='markers',
+                                           marker=dict(color='red', size=8, symbol='x'), name=f'{feat} Anom',
+                                           showlegend=False))
+    other_fig.update_layout(title="Other Telemetry", xaxis_title="Time Step", yaxis_title="Value", height=350)
 
     return rpm_fig, other_fig
+
 
 # Buttons (now with an extra column for explainability)
 col_a, col_b, col_c, col_d = download_col.columns(4)
@@ -195,7 +217,7 @@ if st.session_state.telemetry_df is not None:
     # Show static info
     with controls_placeholder.container():
         st.write(f"Telemetry length: {total_len} rows")
-        st.write(f"Current index: {st.session_state.current_step}/{total_len-1}")
+        st.write(f"Current index: {st.session_state.current_step}/{total_len - 1}")
         st.write(f"Detected anomalies so far: {len(st.session_state.anomaly_indices)}")
 
     # Draw initial plots
@@ -215,7 +237,8 @@ if st.session_state.telemetry_df is not None:
             # Prepare the latest TIMESTEPS window
             if idx - TIMESTEPS + 1 < 0:
                 continue
-            window_df = st.session_state.telemetry_df.iloc[idx - TIMESTEPS + 1: idx + 1][['Speed', 'RPM', 'Throttle', 'Brake', 'nGear', 'DRS']]
+            window_df = st.session_state.telemetry_df.iloc[idx - TIMESTEPS + 1: idx + 1][
+                ['Speed', 'RPM', 'Throttle', 'Brake', 'nGear', 'DRS']]
 
             is_anom, rec_err, threshold = send_window_and_check_anomaly(window_df)
             if is_anom:
@@ -224,7 +247,8 @@ if st.session_state.telemetry_df is not None:
             st.session_state.current_step = idx
 
             # Update status
-            status_col.info(f"Step {idx}/{total_len-1} — Anomaly: {is_anom} — RecErr: {rec_err} — Thresh: {threshold}")
+            status_col.info(
+                f"Step {idx}/{total_len - 1} — Anomaly: {is_anom} — RecErr: {rec_err} — Thresh: {threshold}")
 
             # Rebuild plots and display
             rpm_fig, other_fig = build_plots(idx)
@@ -244,7 +268,6 @@ else:
 # Explainability UI (appears when we have stored explain_results)
 if st.session_state.explain_results:
     results = st.session_state.explain_results
-    # Basic summary
     seq_end_indices = results.get("sequence_end_indices", [])
     reconstruction_error = results.get("reconstruction_error", [])
     is_anomaly = results.get("is_anomaly", [])
@@ -255,54 +278,60 @@ if st.session_state.explain_results:
     num_anomalies = sum(is_anomaly)
     explain_col.header("Explainability Results (Batch)")
     explain_col.metric("Total Anomalous Sequences Detected", num_anomalies)
-    if threshold is not None:
-        explain_col.write(f"Threshold used: {threshold:.6f}")
 
     if num_anomalies == 0:
         explain_col.info("No anomalies detected for this lap (batch analysis).")
     else:
-        explain_col.subheader("Anomaly Explanations")
+        explain_col.subheader("Anomaly Explanations Log")
         anomaly_sequences = [i for i, flag in enumerate(is_anomaly) if flag]
+
         # Selection widget for anomaly to inspect
-        selected_idx = explain_col.selectbox(
-            "Choose anomaly (sequence index)",
+        selected_seq_idx = explain_col.selectbox(
+            "Choose an anomalous sequence to analyze:",
             options=anomaly_sequences,
-            format_func=lambda i: f"Seq {i} (end idx={seq_end_indices[i]})"
+            format_func=lambda i: f"Sequence {i} (ends at time step {seq_end_indices[i]})"
         )
 
-        # Show top contributing features bar chart
-        chosen_top = top_features[selected_idx]  # list of (feature, error)
-        if chosen_top:
-            top_df = pd.DataFrame(chosen_top, columns=["feature", "error"])
-            top_fig = px.bar(top_df, x="feature", y="error", title=f"Top contributing features for sequence {selected_idx}")
-            explain_col.plotly_chart(top_fig, use_container_width=True)
-        else:
-            explain_col.write("No top feature data available for this sequence.")
+        # Construct the report for the selected anomaly
+        anomaly_report = {
+            "sequence_index": selected_seq_idx,
+            "end_index": seq_end_indices[selected_seq_idx],
+            "threshold": threshold,
+            "reconstruction_error": reconstruction_error[selected_seq_idx],
+            "top_features": top_features[selected_seq_idx],
+            "feature_errors": feature_errors[selected_seq_idx]
+        }
 
-        # Show heatmap of per-sequence per-feature errors (rows = sequences, cols = features)
-        if feature_errors:
-            err_matrix = pd.DataFrame(feature_errors)
-            # x axis: sequence indices, y axis: features
-            heat_fig = px.imshow(err_matrix.T, labels=dict(x="Sequence Index", y="Feature", color="Mean MAE"), x=[f"seq_{i}" for i in range(err_matrix.shape[0])], y=err_matrix.columns, aspect="auto", title="Per-sequence per-feature reconstruction error (mean over timesteps)")
-            explain_col.plotly_chart(heat_fig, use_container_width=True)
-        else:
-            explain_col.write("No per-feature error matrix available.")
+        # Display the generated text explanation and chart using the new module
+        st.markdown("---")
+        text_explanation = generate_anomaly_explanation_text(anomaly_report)
+        st.markdown(text_explanation)
 
-        # Show raw telemetry window around the selected anomaly end index
-        end_idx = seq_end_indices[selected_idx]
-        window_start = max(0, end_idx - TIMESTEPS - 5)
-        window_end = min(len(st.session_state.telemetry_df) - 1, end_idx + 5)
-        explain_col.write(f"Raw telemetry around anomaly (rows {window_start} to {window_end})")
-        explain_col.dataframe(st.session_state.telemetry_df.iloc[window_start:window_end+1].reset_index(drop=True))
+        chart_title = f"Top Contributing Features for Anomaly in Sequence {selected_seq_idx}"
+        top_features_fig = create_top_features_chart(anomaly_report, title=chart_title)
+        if top_features_fig:
+            st.plotly_chart(top_features_fig, use_container_width=True)
+        st.markdown("---")
 
-        # Download JSON report for the selected anomaly
-        if explain_col.button("Download anomaly report (JSON)"):
-            report = {
-                "sequence_index": selected_idx,
-                "end_index": end_idx,
-                "threshold": threshold,
-                "reconstruction_error": reconstruction_error[selected_idx] if selected_idx < len(reconstruction_error) else None,
-                "top_features": top_features[selected_idx] if selected_idx < len(top_features) else None,
-                "feature_errors": feature_errors[selected_idx] if selected_idx < len(feature_errors) else None
-            }
-            explain_col.download_button("Download JSON", data=json.dumps(report, indent=2), file_name=f"anomaly_seq_{selected_idx}.json", mime="application/json")
+        # UI for downloading and viewing raw data remains
+        expander = st.expander("Explore Raw Data and Full Error Matrix")
+        with expander:
+            # Show heatmap of per-sequence per-feature errors
+            if feature_errors:
+                err_matrix = pd.DataFrame(feature_errors)
+                heat_fig = px.imshow(err_matrix.T, labels=dict(x="Sequence Index", y="Feature", color="Mean MAE"),
+                                     x=[f"seq_{i}" for i in range(err_matrix.shape[0])], y=err_matrix.columns,
+                                     aspect="auto", title="Full Lap: Per-Sequence, Per-Feature Reconstruction Error")
+                st.plotly_chart(heat_fig, use_container_width=True)
+
+            # Show raw telemetry window around the selected anomaly end index
+            end_idx = seq_end_indices[selected_seq_idx]
+            window_start = max(0, end_idx - TIMESTEPS - 5)
+            window_end = min(len(st.session_state.telemetry_df) - 1, end_idx + 5)
+            st.write(f"Raw telemetry around anomaly (rows {window_start} to {window_end})")
+            st.dataframe(st.session_state.telemetry_df.iloc[window_start:window_end + 1])
+
+            # Download JSON report for the selected anomaly
+            if st.button("Prepare Anomaly Report for Download"):
+                st.download_button("Download JSON", data=json.dumps(anomaly_report, indent=2),
+                                   file_name=f"anomaly_report_seq_{selected_seq_idx}.json", mime="application/json")
