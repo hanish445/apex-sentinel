@@ -16,7 +16,7 @@ THRESHOLD_PATH = os.path.join('models', 'threshold.json')
 TIMESTEPS = 10
 
 # --- FastAPI App Initialization ---
-app = FastAPI(title="F1 Anomaly Detection API with Explanations", version="1.1.0")
+app = FastAPI(title="F1 Anomaly Detection API with Explanations", version="1.0.0")
 
 # --- Load Model, Scaler, and Threshold at Startup ---
 try:
