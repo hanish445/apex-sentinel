@@ -62,9 +62,6 @@ cd <your-repository-name>
 #### Step 2: Install Dependencies
 It's recommended to use a virtual environment.
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-
 # Install all required packages
 pip install -r requirements.txt
 ```
@@ -72,6 +69,14 @@ pip install -r requirements.txt
 
 #### Step 3: Train the Anomaly Detection Model
 Before you can run the application, you must train the AI model. This will create the necessary model and scaler files in the `models/` directory.
+
+Firstly run
+```bash
+python data_collection.py
+python explore_data.py
+```
+and finally train your model
+
 ```bash
 python train_model.py
 ```
