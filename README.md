@@ -80,6 +80,8 @@ python train_model.py
 In your first terminal, start the FastAPI server. This will host your model.
 ```bash
 uvicorn main:app --reload
+(or)
+python main.py
 ```
 Leave this terminal running.
 
