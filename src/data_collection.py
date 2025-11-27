@@ -1,7 +1,7 @@
 import fastf1 as ff1
 import pandas as pd
 import os
-
+import argparse
 
 def collect_telemetry_data(year, grand_prix, session_type, driver, output_dir='data'):
     """
@@ -35,3 +35,26 @@ def collect_telemetry_data(year, grand_prix, session_type, driver, output_dir='d
     except Exception as e:
         print(f"An error occurred during data collection: {e}")
         return None, f"An error occurred: '{e}'. Please check if the Grand Prix name, year, and session type are correct."
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Download and save F1 telemetry data for a driver's fastest lap.")
+    parser.add_argument("--year", type=int, default=2023, help="The championship year.")
+    parser.add_argument("--gp", type=str, default="Bahrain", help="The Grand Prix name.")
+    parser.add_argument("--session", type=str, default="R", help="The session type (e.g., 'R' for Race, 'Q' for Qualifying).")
+    parser.add_argument("--driver", type=str, default="PER", help="The driver's three-letter abbreviation (e.g., 'VER', 'PER').")
+    args = parser.parse_args()
+
+    # Define the output directory and ensure it exists
+    output_directory = 'data'
+    os.makedirs(output_directory, exist_ok=True)
+    output_path = os.path.join(output_directory, 'telemetry_data.csv')
+
+    # Collect the data
+    telemetry_df, error_msg = collect_telemetry_data(args.year, args.gp, args.session, args.driver)
+
+    if error_msg:
+        print(f"Error: {error_msg}")
+    elif telemetry_df is not None:
+        # Save the data to a CSV file
+        telemetry_df.to_csv(output_path, index=False)
+        print(f"Telemetry data successfully saved to {output_path}")
