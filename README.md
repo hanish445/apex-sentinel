@@ -71,7 +71,7 @@ Source: FastF1 API
 Framework: React.js (v18+),
 Build Tool: Vite,
 Visualization: Plotly.js,
-Styling: Custom CSS Modules (Corporate Dark Theme)
+Styling: Custom CSS Modules
 
 ## 5. Installation & Usage
 
