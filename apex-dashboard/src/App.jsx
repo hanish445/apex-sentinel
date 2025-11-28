@@ -120,7 +120,7 @@ function App() {
             {view === 'dashboard' && (
                 <aside className="sidebar">
                     <div className="brand">
-                        <span>🛡️</span> APEX SENTINEL
+                        <span>APEX SENTINEL</span>
                     </div>
 
                     <div className="control-section">
@@ -193,9 +193,12 @@ function App() {
                                 {/* DRS LOGIC: Value > 8 means Open */}
                                 <div className="metric-card">
                                     <span className="metric-label">DRS STATUS</span>
-                                    <span className="metric-val" style={{color: metrics.DRS > 8 ? '#22c55e' : '#52525b', fontSize: '18px'}}>
-                            {metrics.DRS > 8 ? "OPEN" : "CLOSED"}
-                        </span>
+                                    <span className="metric-val" style={{
+                                        fontSize: '18px',
+                                        color: metrics.DRS >= 10 ? '#22c55e' : (metrics.DRS === 8 ? '#eab308' : '#52525b')
+                                    }}>
+                                        {metrics.DRS >= 10 ? "OPEN" : (metrics.DRS === 8 ? "READY" : "CLOSED")}
+                                    </span>
                                 </div>
                             </div>
 
