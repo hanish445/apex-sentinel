@@ -126,4 +126,5 @@ Forensics: Click "Run Batch Analysis" to process the full lap. A "Forensics Repo
 The roadmap for the next major version of Apex Sentinel focuses on adding deeper layers of intelligence and context.
 
 Intelligent Anomaly Classification: Training a second machine learning model (e.g., XGBoost) to automatically classify detected anomalies into meaningful categories, such as True Anomaly (likely a system failure) vs. False Positive (likely a driver-induced event like a spin or crash).
+
 2D Track Map Visualization: Adding a new visualization panel to plot the physical X and Y location of each anomaly directly onto a 2D map of the circuit, providing crucial spatial context to every event.
