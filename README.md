@@ -86,30 +86,39 @@ Node.js & npm
 ## Step 1: Backend Setup (Terminal 1)
 
 ### 1. Install Python dependencies
+```
 pip install -r requirements.txt
+```
 
 ### 2. Train the Model (First run only)
+```
 python src/data_collection.py  # Download sample data
 python src/explore_data.py     # Preprocess & Scale
 python src/train_model.py      # Train LSTM & Save Model
+```
 
 ### 3. Start the API Server
+```
 uvicorn main:app --reload
-
-
-The API will start at https://www.google.com/search?q=http://127.0.0.1:8000
+http://127.0.0.1:8000
+```
 
 ## Step 2: Frontend Setup (Terminal 2)
 
 ### 1. Navigate to dashboard directory
+```
 cd apex-dashboard
+```
 
 ### 2. Install Node modules
+```
 npm install
+```
 
 ### 3. Start the React Application
+```
 npm run dev
-
+```
 
 ## 6. Workflow
 
