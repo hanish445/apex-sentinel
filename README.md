@@ -1,113 +1,129 @@
-# 🏁 Apex Sentinel V 1.0.0
+# Apex Sentinel v1.5.0
 
-### 1. Project Overview
+Real-Time F1 Telemetry Integrity & Anomaly Detection System
 
-**Name:** Apex Sentinel
+## Development Acknowledgment
+This project was developed with the assistance of advanced Generative AI tools. AI was utilized to accelerate the architectural migration from Streamlit to React, optimize the data simulation loops, and refine the forensic reporting logic, demonstrating the effective collaboration between human engineering and artificial intelligence.
 
-**Description:** Apex Sentinel is a real-time, AI-powered anomaly detection system designed to analyze telemetry data from Formula 1 cars. It learns the complex patterns of normal vehicle behavior and flags any deviations, providing engineers and strategists with detailed, automated explanations for each detected event.
+## 1. Project Overview
 
-**Goal:** The primary goal of Apex Sentinel is to proactively identify potential system failures, unexpected driver actions, or other unusual events by monitoring a vehicle's data stream in real-time. By catching these anomalies early, the system aims to enhance reliability, performance, and strategic decision-making.
+Description: Apex Sentinel is a professional-grade, real-time AI anomaly detection system designed to analyze telemetry data from Formula 1 cars. It learns the complex patterns of normal vehicle behavior using an LSTM Autoencoder and flags deviant events with millisecond precision, providing engineers with automated, context-aware forensic reports.
 
----
+Goal: The primary goal is to proactively identify potential system failures, sensor glitches, or unexpected driver actions by monitoring the vehicle's data stream as an Intrusion Detection System (IDS) for physical assets.
 
-### 2. Key Features
+## 2. The Blend of AI/ML and Cybersecurity
 
-Apex Sentinel V 1.0.0 is a complete, end-to-end application with a rich feature set:
+At its core, Apex Sentinel reframes a classic cybersecurity concept in the context of high-performance engineering.
 
-*   **🧠 Core AI Anomaly Detection:** Utilizes a sophisticated LSTM (Long Short-Term Memory) Autoencoder built with TensorFlow to learn the intricate relationships between different telemetry channels.
-*   **📈 Dynamic Anomaly Threshold:** Automatically calculates a statistical threshold after training, ensuring that anomaly detection is robust and data-driven, not based on arbitrary fixed values.
-*   **☁️ On-Demand F1 Data Engine:** Connects directly to the `fastf1` library to download real-world telemetry from any recent F1 season, allowing for analysis of specific drivers, sessions, and Grand Prix.
-*   **⚙️ Robust API Backend:** A high-performance backend built with FastAPI that serves the trained model and provides a detailed JSON response for prediction and explainability requests.
-*   **🖥️ Interactive Simulation Dashboard:** A user-friendly web interface built with Streamlit that allows for:
-    *   Dynamic selection of race data.
-    *   Real-time simulation of a lap, with live-updating telemetry plots.
-    *   Immediate visual marking of detected anomalies on graphs.
-*   **🤖 Advanced Explainability Engine:** The standout feature of Apex Sentinel. It doesn't just find anomalies; it explains them:
-    *   **Automated Text Summaries:** Generates human-readable reports for each anomaly.
-    *   **Dynamic Interpretation:** The explanation text is context-aware, changing based on which telemetry channels caused the anomaly (e.g., an `RPM` and `Throttle` issue gets a different explanation than a `Brake` and `Speed` issue).
-    *   **Root Cause Charting:** Automatically generates a bar chart showing the top 3 contributing features for any anomaly.
-*   **📑 Batch Analysis & Reporting:** After a simulation, a full "batch analysis" can be run to generate a comprehensive log of all anomalies from the lap, with options to inspect each one and download a JSON report.
+### The Cybersecurity Parallel
 
----
+In network security, an Intrusion Detection System (IDS) monitors network traffic for packets that deviate from a "normal" baseline. Apex Sentinel does the exact same thing, but instead of network packets, it monitors a stream of sensor data from the F1 car. An "intrusion" or "anomaly" in this context represents:
 
-### 3. The Blend of AI/ML and Cybersecurity
+Integrity Loss: A compromised sensor sending faulty data.
 
-At its core, Apex Sentinel is an **Intrusion Detection System (IDS) for a physical asset**. It reframes a classic cybersecurity concept in the context of high-performance engineering.
+Availability Risk: The beginning of a mechanical or electronic system failure.
 
-*   **The Cybersecurity Parallel:** In network security, an IDS monitors network traffic for patterns that deviate from a "normal" baseline, flagging potential intrusions. Apex Sentinel does the exact same thing, but instead of network packets, it monitors a stream of sensor data from a physical system—the F1 car. An "intrusion" or "anomaly" could represent:
-    *   A compromised sensor sending faulty data.
-    *   The beginning of a mechanical or electronic system failure.
-    *   An unexpected physical event (like a spin or impact) that puts the system in an unknown state.
-    
-    By monitoring this data integrity, we are working to protect the car's performance, reliability, and the safety of its systems.
+Unknown State: An unexpected physical event (like a spin or impact) that puts the system outside its safety envelope.
 
-*   **The AI/ML Advantage:** A traditional system might use simple rules (e.g., "alert if RPM > 12,000"). The AI/ML model in Apex Sentinel is far more powerful. It learns the **complex, non-linear relationships** between *all* telemetry channels. For example, it knows that high RPM is normal when the throttle is high and the gear is low, but it would correctly flag high RPM with zero throttle as a major anomaly. This ability to understand **context** across dozens of data points is what allows it to detect subtle issues that a rule-based system would miss.
+### The AI/ML Advantage
 
----
+Traditional rule-based systems (e.g., "Alert if RPM > 13,000") fail to capture context. Apex Sentinel uses Deep Learning to understand non-linear relationships. For example, it knows that high RPM is normal when throttle is 100%, but it correctly flags high RPM with 0% throttle as a critical anomaly. This contextual awareness allows it to detect subtle issues that static rules would miss.
 
-### 4. How to Run the Software
+## 3. Key Features (v1.5.0)
 
-To get Apex Sentinel running, follow these steps.
+Version 1.5.0 introduces a major architectural overhaul, moving to a decoupled Client-Server model for enterprise-grade performance.
 
-#### Prerequisites
-*   Python 3.8+
-*   `pip` for installing packages
+### Core Intelligence
 
-#### Step 1: Clone the Repository
-```bash
-git clone <your-repository-url>
-cd <your-repository-name>
-```
+LSTM Autoencoder: A sophisticated Deep Learning model built with TensorFlow that learns the intricate correlations between Speed, RPM, Throttle, Brake, Gear, and DRS.
 
-#### Step 2: Install Dependencies
-It's recommended to use a virtual environment.
-```bash
-# Install all required packages
+Dynamic Thresholding: Automatically calculates statistical deviation limits based on training data reconstruction error (Mean + 3 StdDev).
+
+### Professional Dashboard
+
+React + Vite Engine: A completely rewritten frontend using React.js and Vite, delivering 60FPS performance and eliminating the UI jitter found in previous versions.
+
+Client-Side Simulation: The telemetry loop now runs natively in the browser's JavaScript engine, ensuring smooth, non-blocking data playback.
+
+Live Telemetry Gauges: Real-time analog-style visualization for Speed, RPM, and Throttle.
+
+### Advanced Forensics Engine
+
+Automated Root Cause Analysis: The system doesn't just flag errors; it explains them.
+
+Context-Aware Reporting: Python logic analyzes the feature contribution vectors to generate human-readable explanations (e.g., distinguishing between a "Lock-up" and a "Power Unit" issue).
+
+Batch Analysis: One-click forensic scan of the entire session to generate a detailed log of all anomaly events.
+
+### F1 Data Engine
+
+On-Demand Ingestion: Connects directly to the fastf1 library to download real-world telemetry from any recent F1 season (2018-2024), driver, or session type (FP1, Quali, Race).
+
+## 4. Tech Stack
+
+### Backend (The Brain)
+Framework: FastAPI (Python),
+ML Engine: TensorFlow / Keras,
+Data Processing: Pandas, NumPy, Scikit-learn,
+Source: FastF1 API
+
+### Frontend (The Monitor)
+Framework: React.js (v18+),
+Build Tool: Vite,
+Visualization: Plotly.js,
+Styling: Custom CSS Modules (Corporate Dark Theme)
+
+## 5. Installation & Usage
+
+Running Apex Sentinel requires two active terminals: one for the API server and one for the Dashboard.
+
+Prerequisites
+
+Python 3.8+
+
+Node.js & npm
+
+## Step 1: Backend Setup (Terminal 1)
+
+### 1. Install Python dependencies
 pip install -r requirements.txt
-```
-*(You will need to create a `requirements.txt` file containing `streamlit`, `fastapi`, `uvicorn`, `tensorflow`, `pandas`, `plotly`, `scikit-learn`, and `fastf1`)*
 
-#### Step 3: Train the Anomaly Detection Model
-Before you can run the application, you must train the AI model. This will create the necessary model and scaler files in the `models/` directory.
+### 2. Train the Model (First run only)
+python src/data_collection.py  # Download sample data
+python src/explore_data.py     # Preprocess & Scale
+python src/train_model.py      # Train LSTM & Save Model
 
-Firstly run
-```bash
-python data_collection.py
-python explore_data.py
-```
-and finally train your model
-
-```bash
-python train_model.py
-```
-
-#### Step 4: Run the API Backend
-In your first terminal, start the FastAPI server. This will host your model.
-```bash
+### 3. Start the API Server
 uvicorn main:app --reload
-(or)
-python main.py
-```
-Leave this terminal running.
 
-#### Step 5: Run the Streamlit Dashboard
-In a **second** terminal, run the Streamlit web application.
-```bash
-streamlit run dashboard.py
-```
-Your web browser should automatically open with the Apex Sentinel dashboard.
 
-#### Step 6: Use the Application
-1.  Use the input fields on the main page to select a Year, Grand Prix, Session, and Driver.
-2.  Click **"Download Lap Data"**.
-3.  Once the data is ready, click **"Start Simulation"** to see the engine in action.
-4.  After the simulation, click **"Run Explainability (Batch)"** to analyze the results.
+The API will start at https://www.google.com/search?q=http://127.0.0.1:8000
 
----
+## Step 2: Frontend Setup (Terminal 2)
 
-### 5. Coming Soon for V 2.0.0
+### 1. Navigate to dashboard directory
+cd apex-dashboard
+
+### 2. Install Node modules
+npm install
+
+### 3. Start the React Application
+npm run dev
+
+
+## 6. Workflow
+
+Configure: Use the sidebar to select Year, GP, Session (Race, Quali, etc.), and Driver.
+
+Load: Click "Load Data" to fetch telemetry from the Python backend.
+
+Simulate: Click "Start Simulation" to begin the real-time playback. Watch the gauges and live charts for instantaneous anomaly markers.
+
+Forensics: Click "Run Batch Analysis" to process the full lap. A "Forensics Report" panel will appear below, listing every detected event with a generated text explanation and root-cause bar chart.
+
+## 7. Coming Soon for v2.0.0
 
 The roadmap for the next major version of Apex Sentinel focuses on adding deeper layers of intelligence and context.
 
-*   **Intelligent Anomaly Classification:** Training a second machine learning model (e.g., XGBoost) to automatically classify detected anomalies into meaningful categories, such as `True Anomaly` (likely a system failure) vs. `False Positive` (likely a driver-induced event like a spin or crash).
-*   **2D Track Map Visualization:** Adding a new visualization panel to plot the physical `X` and `Y` location of each anomaly directly onto a 2D map of the circuit, providing crucial spatial context to every event.
+Intelligent Anomaly Classification: Training a second machine learning model (e.g., XGBoost) to automatically classify detected anomalies into meaningful categories, such as True Anomaly (likely a system failure) vs. False Positive (likely a driver-induced event like a spin or crash).
+2D Track Map Visualization: Adding a new visualization panel to plot the physical X and Y location of each anomaly directly onto a 2D map of the circuit, providing crucial spatial context to every event.
