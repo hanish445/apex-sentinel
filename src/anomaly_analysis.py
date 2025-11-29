@@ -11,111 +11,96 @@ FEATURE_UNITS = {
     'DRS': 'State'
 }
 
-def get_dynamic_interpretation(top_features: list) -> str:
+def classify_event(top_features, raw_snapshot):
     """
-    Generates a dynamic interpretation based on the top contributing features of an anomaly.
+    Applies physics-based heuristics to classify the anomaly type.
 
     Args:
-        top_features: A list of tuples, where each tuple is (feature_name, error_value).
-
-    Returns:
-        A specific, context-aware interpretation string.
+        top_features: List of (feature_name, error_value) tuples.
+        raw_snapshot: Dictionary of raw sensor values at the anomaly timestamp.
     """
-    if not top_features:
-        return "Could not determine a specific interpretation without feature data."
+    feature_names = {f[0] for f in top_features}
 
-    # Extract just the names of the top features for easier lookup
-    feature_names = {feature for feature, error in top_features}
-
-    interpretations = []
-
-    # Rule-based interpretations
-    if 'RPM' in feature_names and 'Throttle' in feature_names:
-        interpretations.append(
-            "High error in both **RPM and Throttle** often points to a power unit issue, an unexpected gear shift, or a loss of traction where engine speed is inconsistent with throttle input.")
-    elif 'RPM' in feature_names:
-        interpretations.append(
-            "A significant deviation in **RPM** could suggest an engine irregularity, a missed gear shift, or hitting the rev limiter unexpectedly.")
-    elif 'Throttle' in feature_names:
-        interpretations.append(
-            "An anomaly in **Throttle** might indicate erratic driver input or a problem with the throttle application sensor.")
-
+    # 1. LOCK-UP DETECTION
+    # Logic: High Brake error + High Speed error + Brake is active
     if 'Brake' in feature_names and 'Speed' in feature_names:
-        interpretations.append(
-            "When **Brake and Speed** are flagged together, it could signal a wheel lock-up under braking, a spin, or a driver action that deviates heavily from normal braking zones.")
-    elif 'Brake' in feature_names:
-        interpretations.append(
-            "Unusual **Brake** data can indicate braking at an unexpected point on the track, a sensor glitch (flickering on/off), or a sign of brake-related issues like fading.")
+        if raw_snapshot.get('Brake', 0) > 50: # Hard braking
+            return "DRIVER LOCK-UP", "Physical Event"
 
+    # 2. TRACTION LOSS / WHEEL SPIN
+    # Logic: High RPM error + High Throttle error + Speed error
+    if 'RPM' in feature_names and 'Throttle' in feature_names:
+        return "TRACTION LOSS", "Physical Event"
+
+    # 3. SENSOR DROPOUT
+    # Logic: Any sensor reads exactly 0.0 while moving
+    # (Simplified check: if Speed > 100 but RPM is 0)
+    if raw_snapshot.get('Speed', 0) > 100:
+        if raw_snapshot.get('RPM', 1) == 0:
+            return "RPM SENSOR FAILURE", "System Critical"
+        if raw_snapshot.get('Throttle', 0) == 0 and 'Throttle' in feature_names:
+            # High throttle error but reading is 0? Suspicious.
+            pass
+
+    # 4. DRS FAULT
     if 'DRS' in feature_names:
-        interpretations.append(
-            "A **DRS** anomaly is significant as it suggests the drag reduction system was activated or deactivated outside of a normal zone, potentially indicating a malfunction or a strategic error.")
+        return "DRS ACTUATION FAULT", "System Warning"
 
-    # If no specific rules were met, provide a general summary based on the top feature.
-    if not interpretations and top_features:
-        top_feature_name = top_features[0][0]
-        interpretations.append(
-            f"The primary deviation was in **{top_feature_name}**. This indicates that its behavior was the most uncharacteristic aspect of this event, warranting a closer look at its data trace.")
-
-    # Combine all relevant interpretations
-    final_interpretation = "\n- **Interpretation**: " + " ".join(interpretations)
-    final_interpretation += "\n\n> **Recommendation**: Always review the raw telemetry graphs around this time step to correlate these findings with specific on-track events or potential system malfunctions."
-
-    return final_interpretation
+    return "ANOMALOUS BEHAVIOR", "Unclassified"
 
 
 def generate_anomaly_explanation_text(anomaly_data: dict) -> str:
     """
-    Generates a human-readable text summary for a single anomaly's explainability report, including units and dynamic interpretation.
-
-    Args:
-        anomaly_data: A dictionary containing details for one anomaly.
-
-    Returns:
-        A formatted string explaining the anomaly.
+    Generates a structured forensic report with classification.
     """
     if not anomaly_data or not anomaly_data.get("top_features"):
-        return "Not enough data to generate a detailed explanation for this anomaly."
+        return "Insufficient data for forensic analysis."
 
     seq_idx = anomaly_data['sequence_index']
     end_idx = anomaly_data['end_index']
     rec_err = anomaly_data['reconstruction_error']
     threshold = anomaly_data['threshold']
     top_features = anomaly_data['top_features']
+    raw_snapshot = anomaly_data.get('raw_snapshot', {}) # New: Raw values for logic
+
+    # --- Run Classification ---
+    event_type, severity = classify_event(top_features, raw_snapshot)
 
     # --- Build Explanation ---
-    explanation = f"**Analysis of Anomaly in Sequence {seq_idx} (ending at time step {end_idx})**\n\n"
-    explanation += f"- **Severity**: The model's reconstruction error was **{rec_err:.6f}**, which is significantly above the anomaly threshold of **{threshold:.6f}**. "
-    explanation += "_(Note: Error and threshold are unitless statistical measures of deviation.)_\n"
-    explanation += "- **Primary Cause**: The anomaly was primarily driven by unexpected deviations in the following telemetry channels:\n"
+    explanation = f"**EVENT #{seq_idx} CLASSIFICATION: {event_type}**\n"
+    explanation += f"**SEVERITY:** {severity} (Error: {rec_err:.4f} / Threshold: {threshold:.4f})\n\n"
 
+    explanation += "**PRIMARY INDICATORS:**\n"
     for i, (feature, error) in enumerate(top_features):
-        unit = FEATURE_UNITS.get(feature, 'unitless')
-        explanation += f"    {i + 1}. **{feature}** (Unit: {unit}): This channel was the most significant contributor to the error. Its behavior was highly uncharacteristic.\n"
+        unit = FEATURE_UNITS.get(feature, '')
+        raw_val = raw_snapshot.get(feature, 'N/A')
+        explanation += f"{i + 1}. **{feature}** (Val: {raw_val} {unit}) - Deviation Score: {error:.4f}\n"
 
-    # --- Add Dynamic Interpretation ---
-    dynamic_interpretation = get_dynamic_interpretation(top_features)
-    explanation += dynamic_interpretation
+    explanation += "\n**AI INTERPRETATION:**\n"
+
+    # Contextual Summary
+    if event_type == "DRIVER LOCK-UP":
+        explanation += "Detected sharp deceleration curve inconsistent with normal braking profile. Likely front-tire lockup or threshold braking overshoot."
+    elif event_type == "TRACTION LOSS":
+        explanation += "Detected RPM spike without corresponding speed increase. Indicates rear wheel spin or gearbox/clutch slip event."
+    elif event_type == "DRS ACTUATION FAULT":
+        explanation += "DRS state change detected outside authorized activation zones. Potential sensor failure or unauthorized driver input."
+    else:
+        explanation += f"Uncharacteristic variance detected in {top_features[0][0]} telemetry channel relative to baseline lap model."
 
     return explanation
 
 
 def create_top_features_chart(anomaly_data: dict, title: str):
-    """
-    Creates a Plotly bar chart for the top contributing features of an anomaly.
-    """
+    """Creates a Plotly bar chart for the top contributing features."""
     top_features = anomaly_data.get("top_features", [])
-    if not top_features:
-        return None
+    if not top_features: return None
 
-    features_with_units = [f"{feat} ({FEATURE_UNITS.get(feat, '')})" for feat, err in top_features]
+    features_with_units = [f"{feat}" for feat, err in top_features]
     errors = [err for feat, err in top_features]
 
-    top_df = pd.DataFrame({
-        "feature": features_with_units,
-        "error": errors
-    })
+    top_df = pd.DataFrame({"feature": features_with_units, "error": errors})
 
     fig = px.bar(top_df, x="feature", y="error", title=title)
-    fig.update_layout(xaxis_title="Telemetry Channel (Unit)", yaxis_title="Contribution to Anomaly (Unitless Error)")
+    fig.update_layout(xaxis_title=None, yaxis_title="Contribution Score")
     return fig

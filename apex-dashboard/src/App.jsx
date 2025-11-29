@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import Plot from 'react-plotly.js';
+import TrackMap from './components/TrackMap'; // Import the new component
 import './App.css';
 
 // --- CONFIGURATION ---
@@ -21,15 +22,12 @@ function App() {
     const [isRunning, setIsRunning] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Metrics incl. DRS
     const [metrics, setMetrics] = useState({ Speed: 0, RPM: 0, nGear: 0, Throttle: 0, Brake: 0, DRS: 0 });
 
-    // Forensics
     const [analysisResults, setAnalysisResults] = useState(null);
     const [selectedAnomalyIndex, setSelectedAnomalyIndex] = useState(null);
 
     // --- ACTIONS ---
-
     const handleClear = () => {
         setIsRunning(false);
         setFullData([]);
@@ -58,6 +56,7 @@ function App() {
         if (!fullData.length) return;
         setLoading(true);
         try {
+            // Filter out X, Y, Z for the prediction payload
             const payload = {
                 Speed: fullData.map(d => d.Speed),
                 RPM: fullData.map(d => d.RPM),
@@ -86,6 +85,14 @@ function App() {
         }
     };
 
+    // --- HELPER: GET TAG STYLE ---
+    const getTagColor = (tag) => {
+        if (!tag) return "#a1a1aa"; // Grey default
+        if (tag.includes("LOCK-UP") || tag.includes("TRACTION")) return "#eab308"; // Yellow (Warning/Physical)
+        if (tag.includes("SENSOR") || tag.includes("FAULT") || tag.includes("CRITICAL")) return "#ef4444"; // Red (System Critical)
+        return "#a1a1aa";
+    };
+
     // --- SIMULATION LOOP ---
     useEffect(() => {
         let interval;
@@ -100,16 +107,24 @@ function App() {
         return () => clearInterval(interval);
     }, [isRunning, currentIndex, fullData]);
 
-    // --- HELPER: CHART CONFIG ---
+    // --- DERIVED STATE FOR MAP ---
+    // Convert boolean array to list of indices for the map
+    const anomalyIndices = useMemo(() => {
+        if (!analysisResults) return [];
+        return analysisResults.is_anomaly
+            .map((isAnom, i) => isAnom ? analysisResults.sequence_end_indices[i] : null)
+            .filter(i => i !== null);
+    }, [analysisResults]);
+
+    // --- CHART LAYOUT ---
     const getLayout = () => ({
         autosize: true,
-        margin: { t: 10, r: 10, l: 30, b: 20 },
+        margin: { t: 5, r: 10, l: 30, b: 20 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        showlegend: true,
-        legend: { orientation: 'h', x: 0, y: 1.1, font: { color: '#a1a1aa', size: 10, family: 'JetBrains Mono' } },
-        xaxis: { showgrid: false, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 10 } },
-        yaxis: { showgrid: true, gridcolor: '#27272a', gridwidth: 1, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 10 } },
+        showlegend: false, // Clean up for small grid
+        xaxis: { showgrid: false, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 9 } },
+        yaxis: { showgrid: true, gridcolor: '#27272a', gridwidth: 1, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 9 } },
         font: { family: 'Inter', color: '#f8fafc' }
     });
 
@@ -119,56 +134,33 @@ function App() {
             {/* SIDEBAR */}
             {view === 'dashboard' && (
                 <aside className="sidebar">
-                    <div className="brand">
-                        <span>APEX SENTINEL</span>
-                    </div>
-
+                    <div className="brand">APEX SENTINEL</div>
                     <div className="control-section">
                         <div className="section-label">CONFIGURATION</div>
                         <input className="input-field" type="number" min="2018" max="2025" value={config.year} onChange={e => setConfig({...config, year: parseInt(e.target.value)})} placeholder="Year" />
                         <input className="input-field" value={config.gp} onChange={e => setConfig({...config, gp: e.target.value})} placeholder="Grand Prix" />
-
                         <select className="select-field" value={config.sessionKey} onChange={e => setConfig({...config, sessionKey: e.target.value})}>
                             {Object.keys(SESSION_OPTIONS).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
-
                         <input className="input-field" value={config.driver} onChange={e => setConfig({...config, driver: e.target.value})} placeholder="Driver" />
-                        <button className="btn btn-primary" onClick={handleLoadData} disabled={loading}>
-                            {loading ? "DOWNLOADING..." : "LOAD DATA"}
-                        </button>
+                        <button className="btn btn-primary" onClick={handleLoadData} disabled={loading}>{loading ? "DOWNLOADING..." : "LOAD DATA"}</button>
                     </div>
-
                     <div className="control-section">
                         <div className="section-label">SIMULATION</div>
                         <div className="sim-controls">
-                            <button className="btn btn-green" onClick={() => setIsRunning(!isRunning)} disabled={!fullData.length}>
-                                {isRunning ? "PAUSE" : "PLAY"}
-                            </button>
-                            <button className="btn btn-outline" style={{width: '60px'}} onClick={handleClear} title="Clear">
-                                🗑️
-                            </button>
+                            <button className="btn btn-green" onClick={() => setIsRunning(!isRunning)} disabled={!fullData.length}>{isRunning ? "PAUSE" : "PLAY"}</button>
+                            <button className="btn btn-outline" style={{width: '60px'}} onClick={handleClear} title="Clear">🗑️</button>
                         </div>
                     </div>
-
                     <div className="control-section" style={{marginTop: 'auto'}}>
-                        <button className="btn btn-outline" onClick={handleRunAnalysis} disabled={!fullData.length}>
-                            RUN DIAGNOSTICS
-                        </button>
-                        {analysisResults && (
-                            <button className="btn btn-primary" style={{marginTop: '10px'}} onClick={() => setView('forensics')}>
-                                OPEN FORENSICS REPORT →
-                            </button>
-                        )}
+                        <button className="btn btn-outline" onClick={handleRunAnalysis} disabled={!fullData.length}>RUN DIAGNOSTICS</button>
+                        {analysisResults && <button className="btn btn-primary" style={{marginTop: '10px'}} onClick={() => setView('forensics')}>OPEN REPORT →</button>}
                     </div>
-
-                    <div className="status-badge">
-                        <span>SYSTEM STATUS</span>
-                        <div className={`status-dot ${isRunning ? 'active' : ''}`} />
-                    </div>
+                    <div className="status-badge"><span>SYSTEM STATUS</span><div className={`status-dot ${isRunning ? 'active' : ''}`} /></div>
                 </aside>
             )}
 
-            {/* MAIN CONTENT AREA */}
+            {/* MAIN CONTENT */}
             <main className="main-content">
 
                 {view === 'dashboard' ? (
@@ -182,71 +174,69 @@ function App() {
                         </div>
 
                         <div className="dashboard-view">
-                            {/* METRICS ROW */}
+                            {/* 1. METRICS ROW */}
                             <div className="metrics-row">
                                 <MetricCard label="SPEED" value={Math.round(metrics.Speed)} unit="KM/H" />
                                 <MetricCard label="RPM" value={Math.round(metrics.RPM)} unit="RPM" color="#eab308" />
                                 <MetricCard label="THROTTLE" value={Math.round(metrics.Throttle)} unit="%" color="#22c55e" />
                                 <MetricCard label="BRAKE" value={Math.round(metrics.Brake)} unit="%" color="#ef4444" />
                                 <MetricCard label="GEAR" value={metrics.nGear} unit="" color="#3b82f6" />
-
-                                {/* DRS LOGIC: Value > 8 means Open */}
                                 <div className="metric-card">
                                     <span className="metric-label">DRS STATUS</span>
-                                    <span className="metric-val" style={{
-                                        fontSize: '18px',
-                                        color: metrics.DRS >= 10 ? '#22c55e' : (metrics.DRS === 8 ? '#eab308' : '#52525b')
-                                    }}>
-                                        {metrics.DRS >= 10 ? "OPEN" : (metrics.DRS === 8 ? "READY" : "CLOSED")}
-                                    </span>
+                                    <span className="metric-val" style={{color: metrics.DRS >= 10 ? '#22c55e' : (metrics.DRS === 8 ? '#eab308' : '#52525b'), fontSize: '18px'}}>
+                            {metrics.DRS >= 10 ? "OPEN" : (metrics.DRS === 8 ? "READY" : "CLOSED")}
+                        </span>
                                 </div>
                             </div>
 
-                            {/* CHARTS GRID */}
-                            <div className="charts-layout">
-                                <div className="chart-box">
-                                    <div className="chart-header">SPEED & THROTTLE</div>
-                                    <Plot
-                                        data={[
-                                            { x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Speed), type: 'scatter', mode: 'lines', name: 'Speed', line: {color: '#3b82f6', width: 2} },
-                                            { x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Throttle), type: 'scatter', mode: 'lines', name: 'Throttle', line: {color: '#22c55e', width: 1}, yaxis: 'y2' }
-                                        ]}
-                                        layout={{ ...getLayout(), yaxis2: { overlaying: 'y', side: 'right', showgrid: false } }}
-                                        style={{width: '100%', height: '100%'}}
-                                        config={{displayModeBar: false}}
-                                    />
+                            {/* 2. MAIN STAGE (MAP + CHARTS) */}
+                            <div className="main-stage">
+                                {/* LEFT: TRACK MAP */}
+                                <div className="map-panel">
+                                    <TrackMap fullData={fullData} currentIndex={currentIndex} anomalies={anomalyIndices} />
                                 </div>
-                                <div className="chart-box">
-                                    <div className="chart-header">ENGINE RPM</div>
-                                    <Plot
-                                        data={[
-                                            { x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.RPM), type: 'scatter', mode: 'lines', name: 'RPM', line: {color: '#eab308', width: 1.5} },
-                                            { x: analysisResults ? analysisResults.is_anomaly.map((anom, i) => anom ? analysisResults.sequence_end_indices[i] : null).filter(x => x && x < currentIndex) : [],
-                                                y: analysisResults ? analysisResults.is_anomaly.map((anom, i) => anom ? fullData[analysisResults.sequence_end_indices[i]].RPM : null).filter(x => x !== null) : [],
-                                                mode: 'markers', type: 'scatter', name: 'Anomaly', marker: {color: '#ef4444', size: 6} }
-                                        ]}
-                                        layout={getLayout()}
-                                        style={{width: '100%', height: '100%'}}
-                                        config={{displayModeBar: false}}
-                                    />
-                                </div>
-                                <div className="chart-box">
-                                    <div className="chart-header">BRAKE PRESSURE</div>
-                                    <Plot
-                                        data={[{ x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Brake), type: 'scatter', mode: 'lines', name: 'Brake', fill: 'tozeroy', line: {color: '#ef4444', width: 1.5} }]}
-                                        layout={getLayout()}
-                                        style={{width: '100%', height: '100%'}}
-                                        config={{displayModeBar: false}}
-                                    />
-                                </div>
-                                <div className="chart-box">
-                                    <div className="chart-header">GEAR POSITION</div>
-                                    <Plot
-                                        data={[{ x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.nGear), type: 'scatter', mode: 'lines', step: 'hv', name: 'Gear', line: {color: '#a855f7', width: 1.5} }]}
-                                        layout={getLayout()}
-                                        style={{width: '100%', height: '100%'}}
-                                        config={{displayModeBar: false}}
-                                    />
+
+                                {/* RIGHT: TELEMETRY GRID */}
+                                <div className="telemetry-grid">
+                                    <div className="chart-box">
+                                        <div className="chart-header">SPEED & THROTTLE</div>
+                                        <Plot
+                                            data={[
+                                                { x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Speed), type: 'scatter', mode: 'lines', name: 'Speed', line: {color: '#3b82f6', width: 2} },
+                                                { x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Throttle), type: 'scatter', mode: 'lines', name: 'Throttle', line: {color: '#22c55e', width: 1}, yaxis: 'y2' }
+                                            ]}
+                                            layout={{ ...getLayout(), yaxis2: { overlaying: 'y', side: 'right', showgrid: false } }}
+                                            style={{width: '100%', height: '100%'}}
+                                            config={{displayModeBar: false}}
+                                        />
+                                    </div>
+                                    <div className="chart-box">
+                                        <div className="chart-header">ENGINE RPM</div>
+                                        <Plot
+                                            data={[{ x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.RPM), type: 'scatter', mode: 'lines', name: 'RPM', line: {color: '#eab308', width: 1.5} }]}
+                                            layout={getLayout()}
+                                            style={{width: '100%', height: '100%'}}
+                                            config={{displayModeBar: false}}
+                                        />
+                                    </div>
+                                    <div className="chart-box">
+                                        <div className="chart-header">BRAKE PRESSURE</div>
+                                        <Plot
+                                            data={[{ x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.Brake), type: 'scatter', mode: 'lines', name: 'Brake', fill: 'tozeroy', line: {color: '#ef4444', width: 1.5} }]}
+                                            layout={getLayout()}
+                                            style={{width: '100%', height: '100%'}}
+                                            config={{displayModeBar: false}}
+                                        />
+                                    </div>
+                                    <div className="chart-box">
+                                        <div className="chart-header">GEAR POSITION</div>
+                                        <Plot
+                                            data={[{ x: fullData.slice(0, currentIndex).map((_, i) => i), y: fullData.slice(0, currentIndex).map(d => d.nGear), type: 'scatter', mode: 'lines', step: 'hv', name: 'Gear', line: {color: '#a855f7', width: 1.5} }]}
+                                            layout={getLayout()}
+                                            style={{width: '100%', height: '100%'}}
+                                            config={{displayModeBar: false}}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -265,7 +255,17 @@ function App() {
                                         <div key={idx} className={`event-row ${selectedAnomalyIndex === idx ? 'active' : ''}`} onClick={() => setSelectedAnomalyIndex(idx)}>
                                             <div className="event-main">
                                                 <span>EVENT #{idx}</span>
-                                                <span style={{color:'#ef4444'}}>ERR: {analysisResults.reconstruction_error[idx].toFixed(3)}</span>
+                                                <span className="severity-badge" style={{
+                                                    fontSize: '10px',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px',
+                                                    fontWeight: '700',
+                                                    color: getTagColor(analysisResults.classifications?.[idx]),
+                                                    background: `${getTagColor(analysisResults.classifications?.[idx])}20`, // 20% opacity background
+                                                    border: `1px solid ${getTagColor(analysisResults.classifications?.[idx])}40`
+                                                }}>
+                                                    {analysisResults.classifications ? analysisResults.classifications[idx] : "ANOMALY"}
+                                                </span>
                                             </div>
                                             <div className="event-sub">TIMESTEP {analysisResults.sequence_end_indices[idx]}</div>
                                         </div>
@@ -273,47 +273,27 @@ function App() {
                                 ))}
                             </div>
                         </div>
-
                         <div className="report-detail">
                             {selectedAnomalyIndex !== null ? (
                                 <>
-                                    <div className="report-title">
-                                        <h1>Anomaly Report #{selectedAnomalyIndex}</h1>
-                                        <div className="report-meta">
-                                            <span>TIMESTAMP: T+{analysisResults.sequence_end_indices[selectedAnomalyIndex] * 0.1}s</span>
-                                            <span>THRESHOLD: {analysisResults.threshold.toFixed(4)}</span>
-                                        </div>
-                                    </div>
-
+                                    <div className="report-title"><h1>Anomaly Report #{selectedAnomalyIndex}</h1></div>
                                     <div className="analysis-block">
                                         <div className="block-label">AUTOMATED INTERPRETATION</div>
                                         <div className="text-content">
-                                            {/* Using Python Text */}
-                                            {analysisResults.explanations[selectedAnomalyIndex].split('**').map((part, i) =>
-                                                i % 2 === 1 ? <strong key={i} style={{color: '#eab308'}}>{part}</strong> : part
-                                            )}
+                                            {analysisResults.explanations[selectedAnomalyIndex].split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{color: '#eab308'}}>{part}</strong> : part)}
                                         </div>
                                     </div>
-
-                                    {/* INCREASED HEIGHT HERE */}
                                     <div className="chart-box" style={{height: '500px'}}>
                                         <div className="chart-header">ROOT CAUSE ANALYSIS</div>
                                         <Plot
-                                            data={[{
-                                                x: analysisResults.top_features[selectedAnomalyIndex].map(f => f[0]),
-                                                y: analysisResults.top_features[selectedAnomalyIndex].map(f => f[1]),
-                                                type: 'bar',
-                                                marker: {color: '#ef4444'}
-                                            }]}
+                                            data={[{ x: analysisResults.top_features[selectedAnomalyIndex].map(f => f[0]), y: analysisResults.top_features[selectedAnomalyIndex].map(f => f[1]), type: 'bar', marker: {color: '#ef4444'} }]}
                                             layout={{...getLayout(), margin: {t: 20, b: 30, l: 30, r: 10}}}
                                             style={{width: '100%', height: '100%'}}
                                             config={{displayModeBar: false}}
                                         />
                                     </div>
                                 </>
-                            ) : (
-                                <div className="empty-placeholder">Select an event from the sidebar</div>
-                            )}
+                            ) : <div className="empty-placeholder">Select an event from the sidebar</div>}
                         </div>
                     </div>
                 )}

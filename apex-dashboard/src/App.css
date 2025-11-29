@@ -22,7 +22,7 @@
 
     --font-main: 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
-    --radius: 4px;
+    --radius: 10px;
 }
 
 body {
@@ -168,3 +168,66 @@ body {
 }
 
 @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+.main-stage {
+    flex: 1;
+    display: flex;
+    gap: 12px;
+    overflow: hidden; /* Prevent scrolling inside the stage */
+    min-height: 0;    /* Critical for flexbox scrolling */
+}
+
+/* LEFT: The Map */
+.map-panel {
+    flex: 0 0 40%; /* Fixed 40% width */
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* RIGHT: The Charts */
+.telemetry-grid {
+    flex: 1; /* Takes remaining 60% */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr; /* Equal height rows */
+    gap: 12px;
+}
+
+/* Refined Chart Box for the Grid */
+.chart-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    min-height: 0; /* Allows shrinking */
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    z-index: 5;
+    letter-spacing: 0.5px;
+}
+
+/* Ensure the dashboard view allows flex growth */
+.dashboard-view {
+    flex: 1;
+    padding: 20px;
+    overflow: hidden; /* Changed from auto to hidden to let internal flex containers handle scroll if needed */
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
