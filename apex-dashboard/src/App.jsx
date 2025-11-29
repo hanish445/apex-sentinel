@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import Plot from 'react-plotly.js';
-import TrackMap from './components/TrackMap'; // Import the new component
+import TrackMap from './components/TrackMap';
+import Logo from './components/Logo.jsx';
 import './App.css';
 
 // --- CONFIGURATION ---
@@ -56,7 +57,6 @@ function App() {
         if (!fullData.length) return;
         setLoading(true);
         try {
-            // Filter out X, Y, Z for the prediction payload
             const payload = {
                 Speed: fullData.map(d => d.Speed),
                 RPM: fullData.map(d => d.RPM),
@@ -85,11 +85,10 @@ function App() {
         }
     };
 
-    // --- HELPER: GET TAG STYLE ---
     const getTagColor = (tag) => {
-        if (!tag) return "#a1a1aa"; // Grey default
-        if (tag.includes("LOCK-UP") || tag.includes("TRACTION")) return "#eab308"; // Yellow (Warning/Physical)
-        if (tag.includes("SENSOR") || tag.includes("FAULT") || tag.includes("CRITICAL")) return "#ef4444"; // Red (System Critical)
+        if (!tag) return "#a1a1aa";
+        if (tag.includes("LOCK-UP") || tag.includes("TRACTION")) return "#eab308";
+        if (tag.includes("SENSOR") || tag.includes("FAULT") || tag.includes("CRITICAL")) return "#ef4444";
         return "#a1a1aa";
     };
 
@@ -107,8 +106,6 @@ function App() {
         return () => clearInterval(interval);
     }, [isRunning, currentIndex, fullData]);
 
-    // --- DERIVED STATE FOR MAP ---
-    // Convert boolean array to list of indices for the map
     const anomalyIndices = useMemo(() => {
         if (!analysisResults) return [];
         return analysisResults.is_anomaly
@@ -116,13 +113,12 @@ function App() {
             .filter(i => i !== null);
     }, [analysisResults]);
 
-    // --- CHART LAYOUT ---
     const getLayout = () => ({
         autosize: true,
         margin: { t: 5, r: 10, l: 30, b: 20 },
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
-        showlegend: false, // Clean up for small grid
+        showlegend: false,
         xaxis: { showgrid: false, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 9 } },
         yaxis: { showgrid: true, gridcolor: '#27272a', gridwidth: 1, zeroline: false, color: '#52525b', tickfont: { family: 'JetBrains Mono', size: 9 } },
         font: { family: 'Inter', color: '#f8fafc' }
@@ -134,7 +130,15 @@ function App() {
             {/* SIDEBAR */}
             {view === 'dashboard' && (
                 <aside className="sidebar">
-                    <div className="brand">APEX SENTINEL</div>
+                    {/* NEW LOGO INTEGRATION */}
+                    <div className="brand">
+                        <Logo width={32} height={32} />
+                        <div>
+                            <span style={{color: '#fff'}}>APEX</span>
+                            <span style={{color: '#e10600'}}>SENTINEL</span>
+                        </div>
+                    </div>
+
                     <div className="control-section">
                         <div className="section-label">CONFIGURATION</div>
                         <input className="input-field" type="number" min="2018" max="2025" value={config.year} onChange={e => setConfig({...config, year: parseInt(e.target.value)})} placeholder="Year" />
@@ -174,7 +178,6 @@ function App() {
                         </div>
 
                         <div className="dashboard-view">
-                            {/* 1. METRICS ROW */}
                             <div className="metrics-row">
                                 <MetricCard label="SPEED" value={Math.round(metrics.Speed)} unit="KM/H" />
                                 <MetricCard label="RPM" value={Math.round(metrics.RPM)} unit="RPM" color="#eab308" />
@@ -189,14 +192,11 @@ function App() {
                                 </div>
                             </div>
 
-                            {/* 2. MAIN STAGE (MAP + CHARTS) */}
                             <div className="main-stage">
-                                {/* LEFT: TRACK MAP */}
                                 <div className="map-panel">
                                     <TrackMap fullData={fullData} currentIndex={currentIndex} anomalies={anomalyIndices} />
                                 </div>
 
-                                {/* RIGHT: TELEMETRY GRID */}
                                 <div className="telemetry-grid">
                                     <div className="chart-box">
                                         <div className="chart-header">SPEED & THROTTLE</div>
@@ -255,19 +255,16 @@ function App() {
                                         <div key={idx} className={`event-row ${selectedAnomalyIndex === idx ? 'active' : ''}`} onClick={() => setSelectedAnomalyIndex(idx)}>
                                             <div className="event-main">
                                                 <span>EVENT #{idx}</span>
-                                                <span className="severity-badge" style={{
-                                                    fontSize: '10px',
-                                                    padding: '2px 6px',
-                                                    borderRadius: '4px',
-                                                    fontWeight: '700',
+                                                <span style={{
+                                                    fontSize: '10px', padding: '2px 6px', borderRadius: '2px', fontWeight: '700',
                                                     color: getTagColor(analysisResults.classifications?.[idx]),
-                                                    background: `${getTagColor(analysisResults.classifications?.[idx])}20`, // 20% opacity background
+                                                    background: `${getTagColor(analysisResults.classifications?.[idx])}20`,
                                                     border: `1px solid ${getTagColor(analysisResults.classifications?.[idx])}40`
                                                 }}>
                                                     {analysisResults.classifications ? analysisResults.classifications[idx] : "ANOMALY"}
                                                 </span>
                                             </div>
-                                            <div className="event-sub">TIMESTEP {analysisResults.sequence_end_indices[idx]}</div>
+                                            <div className="event-sub">TIMESTEP {analysisResults.sequence_end_indices[idx]} | ERR: {analysisResults.reconstruction_error[idx].toFixed(2)}</div>
                                         </div>
                                     ) : null
                                 ))}
@@ -280,7 +277,9 @@ function App() {
                                     <div className="analysis-block">
                                         <div className="block-label">AUTOMATED INTERPRETATION</div>
                                         <div className="text-content">
-                                            {analysisResults.explanations[selectedAnomalyIndex].split('**').map((part, i) => i % 2 === 1 ? <strong key={i} style={{color: '#eab308'}}>{part}</strong> : part)}
+                                            {analysisResults.explanations[selectedAnomalyIndex].split('**').map((part, i) =>
+                                                i % 2 === 1 ? <strong key={i} style={{color: '#eab308'}}>{part}</strong> : part
+                                            )}
                                         </div>
                                     </div>
                                     <div className="chart-box" style={{height: '500px'}}>
