@@ -74,7 +74,7 @@ You will need two terminal windows running simultaneously (one for the Backend, 
         ```bash
         python src/explore_data.py
         ```
-    * Train the LSTM model:
+    * Train the LTSM model:
         ```bash
         python src/train_model.py
         ```
