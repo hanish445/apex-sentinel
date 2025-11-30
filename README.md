@@ -40,7 +40,7 @@ This project was developed with the assistance of advanced Generative AI tools, 
 * **Pinpoint Localization**: Plots the driver's live position (Yellow Marker) and exactly where anomalies occurred (Red 'X' Markers) on the track.
 
 ### 🏎️ Core Capabilities
-* **LTSM Autoencoder**: Learns non-linear correlations between Speed, RPM, Throttle, Brake, Gear, and DRS.
+* **LSTM Autoencoder**: Learns non-linear correlations between Speed, RPM, Throttle, Brake, Gear, and DRS.
 * **Dynamic Thresholding**: Automatically calculates deviation limits based on training reconstruction error (Mean + 3 StdDev).
 * **Real-Time Simulation**: Client-side loop plays back race data at 60Hz.
 * **Live Telemetry Gauges**: Analog-style visualization for critical car metrics.
