@@ -66,7 +66,7 @@ You will need two terminal windows running simultaneously (one for the Backend, 
     ```
 
 2.  **Prepare the Data & Model**:
-    * Download telemetry (Default: 2023 Bahrain GP, Perez):
+    * Download telemetry (Default: 2023 Bahrain GP, PER):
         ```bash
         python src/data_collection.py
         ```
