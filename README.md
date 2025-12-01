@@ -110,3 +110,40 @@ You will need two terminal windows running simultaneously (one for the Backend, 
 2.  Click **PLAY** to start the real-time simulation.
 3.  Observe the **Live GPS** map and telemetry charts.
 4.  Click **RUN DIAGNOSTICS** to perform a batch forensic scan of the entire session and view the **Anomaly Report** panel.
+
+# Coming Soon: Apex Sentinel v2.5.0 (The Final Version)
+
+### From Passive Monitor to Active Security Engine
+
+**Apex Sentinel v2.5.0** marks the definitive evolution of this project. While previous versions focused on *observing* data to find anomalies, v2.5.0 transforms the system into a hardened **Cyber-Physical Security Engine**.
+
+The goal of this final release is to move beyond "finding errors" and focus on **proving resilience** and **guaranteeing integrity**. In the high-stakes world of motorsport and operational technology (OT), it is not enough to suspect a failure; you must be able to withstand an attack and prove your evidence is real.
+
+## The "Final" Features
+
+Version 2.5.0 introduces two critical pillars that bridge the gap between data science and cybersecurity: **Adversarial Validation** and **Forensic Integrity**.
+
+### 1. The "Red Team" Injection Module (Active Defense)
+* **The Challenge:** Passive systems are untested systems. Waiting for a natural failure does not prove the AI can catch a malicious actor.
+* **The Solution:** A built-in adversarial attack suite that allows users to inject synthetic hacks into the live telemetry stream.
+* **Capabilities:**
+    * **Signal Jamming:** Freezing sensor outputs (e.g., RPM) to test "dead sensor" logic.
+    * **Drift Injection:** Gradually biasing throttle inputs to mimic calibration hacks or mechanical degradation.
+    * **GPS Spoofing:** Altering coordinate data to test geospatial geofencing.
+* **The Goal:** To provide immediate, verifiable proof that the AI engine can detect specific attack vectors in milliseconds.
+
+### 2. "Black Box" Forensic Ledger (Integrity)
+* **The Challenge:** In any investigation—whether a race steward inquiry or a cyber incident response—logs are the first target for tampering. A mutable CSV file is not evidence; it is just a file.
+* **The Solution:** An immutable, cryptographic logging system.
+* **Capabilities:**
+    * **Event Hashing:** Every detected anomaly generates a unique SHA-256 hash fingerprint.
+    * **Secure Ledger:** These hashes are stored in a read-only "Black Box" file separate from the raw data.
+    * **Tamper Alerting:** If the post-session telemetry files do not match the hashes in the ledger, the system flags the dataset as compromised.
+* **The Goal:** To ensure **Non-Repudiation**. Once Apex Sentinel sees an event, that event becomes an unalterable part of the session history.
+
+## Roadmap to v2.5.0
+This release represents the completion of the Apex Sentinel:
+
+1.  **Detection (Completed in v2.0):** The system successfully identifies and classifies physical anomalies.
+2.  **Validation (Coming in v2.5):** The system proves it can catch intentional attacks.
+3.  **Integrity (Coming in v2.5):** The system protects its findings from human interference.
