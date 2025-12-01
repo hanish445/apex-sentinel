@@ -13,13 +13,13 @@ This project was developed with the assistance of advanced Generative AI tools, 
 
 ## 3. Tech Stack
 
-### Backend (The Brain)
+### Backend
 * **Framework**: FastAPI (Python)
 * **ML Engine**: TensorFlow / Keras (LSTM Autoencoder)
 * **Data Source**: FastF1 (Official F1 Timing & Telemetry)
 * **Data Processing**: Pandas, NumPy, Scikit-learn
 
-### Frontend (The Monitor)
+### Frontend
 * **Framework**: React.js (v18+)
 * **Build Tool**: Vite
 * **Visualization**: Plotly.js (Real-time charts & Track Map)
@@ -27,7 +27,7 @@ This project was developed with the assistance of advanced Generative AI tools, 
 
 ## 4. Key Features (v2.0.0)
 
-### 🧠 Advanced AI & Forensics (New in v2.0)
+### Advanced AI & Forensics (New in v2.0)
 * **Automated Event Classification**: The system uses physics-based heuristics to classify anomalies into specific categories:
     * **Driver Lock-up**: Detected via brake pressure vs. deceleration deltas.
     * **Traction Loss**: Detected via RPM spikes inconsistent with speed (wheel spin).
@@ -35,11 +35,11 @@ This project was developed with the assistance of advanced Generative AI tools, 
     * **DRS Faults**: Identifies unauthorized DRS activation outside designated zones.
 * **AI Interpretation**: Generates human-readable forensic reports explaining *why* an event was flagged (e.g., *"Detected sharp deceleration curve inconsistent with normal braking profile"*).
 
-### 📍 Spatial Intelligence (New in v2.0)
+### Spatial Intelligence (New in v2.0)
 * **Live 2D Track Map**: Renders the circuit geometry using GPS data.
 * **Pinpoint Localization**: Plots the driver's live position (Yellow Marker) and exactly where anomalies occurred (Red 'X' Markers) on the track.
 
-### 🏎️ Core Capabilities
+### Core Capabilities
 * **LSTM Autoencoder**: Learns non-linear correlations between Speed, RPM, Throttle, Brake, Gear, and DRS.
 * **Dynamic Thresholding**: Automatically calculates deviation limits based on training reconstruction error (Mean + 3 StdDev).
 * **Real-Time Simulation**: Client-side loop plays back race data at 60Hz.
