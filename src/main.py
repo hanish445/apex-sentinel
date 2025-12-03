@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from data_collection import collect_telemetry_data
 from anomaly_analysis import generate_anomaly_explanation_text, classify_event
+from security_ledger import log_to_ledger
 
 # --- Configuration ---
 MODEL_PATH = os.path.join('models', 'anomaly_detector.keras')
@@ -105,6 +106,7 @@ def predict_anomaly(data: TelemetryData):
 
     # [NEW] List to store the specific tags (e.g., "LOCK-UP", "SENSOR FAIL")
     classifications_list = []
+    forensics_receipts = []
 
     for i, seq_err in enumerate(per_feature_error):
         feat_map = {MODEL_FEATURES[j]: float(seq_err[j]) for j in range(len(MODEL_FEATURES))}
@@ -114,6 +116,7 @@ def predict_anomaly(data: TelemetryData):
 
         explanation = ""
         tag = "NORMAL" # Default tag
+        receipt = None
 
         if anomalies[i]:
             end_idx = sequence_end_indices[i]
@@ -129,12 +132,24 @@ def predict_anomaly(data: TelemetryData):
                 "threshold": float(threshold),
                 "reconstruction_error": float(reconstruction_error[i]),
                 "top_features": top_3,
-                "raw_snapshot": raw_snapshot
+                "raw_snapshot": raw_snapshot,
+                "classification": event_type,
+                "severity": severity
             }
+            event_id, event_hash, pdf_filename = log_to_ledger(report)
+
+            # Add security metadata to the explanation
             explanation = generate_anomaly_explanation_text(report)
+            explanation += f"\n\n🔒 **CHAIN OF CUSTODY SECURED**\n"
+            explanation += f"ID: {event_id}\n"
+            explanation += f"HASH: {event_hash[:16]}...\n"
+            explanation += f"EVIDENCE: {pdf_filename} generated."
+
+            receipt = {"id": event_id, "hash": event_hash, "pdf": pdf_filename}
 
         explanations_list.append(explanation)
         classifications_list.append(tag)
+        forensics_receipts.append(receipt)
 
     return {
         "is_anomaly": anomalies.tolist(),
