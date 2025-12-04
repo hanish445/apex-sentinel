@@ -1,5 +1,15 @@
 # Apex Sentinel v2.5.0 (Final)
 
+## Data Fidelity & Limitations
+
+**Apex Sentinel** is built on public telemetry data provided by the [FastF1](https://docs.fastf1.dev/) library. Users should be aware of the following physical limitations:
+
+* **Sample Rate:** Public F1 telemetry is sampled at ~4-10Hz. High-frequency vibration attacks or micro-second sensor glitches may be lost in downsampling.
+* **GPS Precision:** Geospatial data has a variance of ±10m compared to military-grade RTK-GPS used by teams.
+* **Telemetry Latency:** This system operates on "Near Real-Time" data (delayed by API ingestion), whereas a production version would require direct CAN bus access (milliseconds latency).
+
+*Note: The AI models have been tuned to accommodate this noise floor using dynamic thresholding.*
+
 ## Developer Acknowledgment
 Developed with the assistance of advanced AI tools (**Gemini / ChatGPT**) to accelerate complex mathematical modeling for sector analysis, optimize the React simulation loop for 60FPS, and refine the forensic reporting architecture. This project demonstrates the effective collaboration between human engineering and artificial intelligence.
 
