@@ -9,30 +9,36 @@ const Logo = ({ width = 40, height = 40 }) => (
         xmlns="http://www.w3.org/2000/svg"
         aria-label="Apex Sentinel Logo"
     >
-        {/* Shield Base */}
+        {/* Construction Lines (The "Blueprint" look) */}
+        <line x1="50" y1="5" x2="50" y2="95" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="10" y1="50" x2="90" y2="50" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 4" />
+
+        {/* Shield Base - Technical Outline */}
         <path
-            d="M50 5 L90 20 V50 C90 75 50 95 50 95 C50 95 10 75 10 50 V20 L50 5 Z"
-            stroke="white"
-            strokeWidth="4"
+            d="M50 10 L85 25 V50 C85 70 50 90 50 90 C50 90 15 70 15 50 V25 L50 10 Z"
+            stroke="#2563eb"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
-            fill="none"
+            fill="rgba(37, 99, 235, 0.05)"
         />
 
-        {/* Apex Speed Line */}
+        {/* Apex Trajectory Line */}
         <path
-            d="M30 65 L50 35 L85 35"
-            stroke="#e10600"
-            strokeWidth="6"
+            d="M32 65 L50 38 L80 38"
+            stroke="#dc2626"
+            strokeWidth="4"
             strokeLinecap="square"
         />
 
-        {/* Sensor Dot */}
-        <circle cx="30" cy="65" r="4" fill="#e10600" />
+        {/* Sensor Nodes */}
+        <circle cx="32" cy="65" r="3" fill="#ffffff" stroke="#dc2626" strokeWidth="2" />
+        <circle cx="50" cy="10" r="2" fill="#2563eb" />
+        <circle cx="50" cy="90" r="2" fill="#2563eb" />
 
-        {/* Tech Details */}
-        <path d="M40 75 H60" stroke="#3f3f46" strokeWidth="2" />
-        <path d="M45 82 H55" stroke="#3f3f46" strokeWidth="2" />
+        {/* Technical Markings */}
+        <path d="M42 78 H58" stroke="#0f172a" strokeWidth="2" />
+        <path d="M45 84 H55" stroke="#0f172a" strokeWidth="1" />
     </svg>
 );
 
