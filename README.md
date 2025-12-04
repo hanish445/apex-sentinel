@@ -6,7 +6,7 @@ Developed with the assistance of advanced AI tools (**Gemini / ChatGPT**) to acc
 ---
 
 ### Description
-**Apex Sentinel** is a security engine designed to protect high-performance physical assets. Unlike traditional firewalls that inspect data packets, Apex Sentinel inspects **physical physics**.
+**Apex Sentinel** is a security engine designed to protect high-performance physical assets. Unlike traditional firewalls that inspect data packets, Apex Sentinel inspects **"physical physics"**. That is to ensure the components obey the laws of **vehicle dynamics**
 
 It uses a **Deep Learning LSTM (Long-Short Term Memory) Autoencoder** to learn the baseline behavior of a Formula 1 car and detects anomalies—whether caused by mechanical failure, sensor degradation, or malicious cyber-attacks—in real-time.
 
