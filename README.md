@@ -1,149 +1,93 @@
-# Apex Sentinel v2.0.0
+# Apex Sentinel v2.5.0
 
-**Real-Time F1 Telemetry Integrity & Anomaly Detection System**
+## Developer Acknowledgment
+Developed with the assistance of advanced AI tools (**Gemini / ChatGPT**) to accelerate complex mathematical modeling for sector analysis, optimize the React simulation loop for 60FPS, and refine the forensic reporting architecture. This project demonstrates the effective collaboration between human engineering and artificial intelligence.
 
-## 1. Project Overview
+---
 
-**Apex Sentinel** is a professional-grade, real-time AI anomaly detection system designed to analyze telemetry data from Formula 1 cars. It learns the complex patterns of normal vehicle behavior using an **LSTM Autoencoder** and flags deviant events with millisecond precision.
+### Description
+**Apex Sentinel** is a security engine designed to protect high-performance physical assets. Unlike traditional firewalls that inspect data packets, Apex Sentinel inspects **physical physics**.
 
-**Version 2.0.0** introduces a significant leap in forensic capability. Beyond simple anomaly detection, the system now **classifies** events (e.g., distinguishing between a driver lock-up and a sensor failure) and maps them physically onto a **live 2D track map**, providing engineers with immediate, context-aware intelligence.
+It uses a **Deep Learning LSTM (Long-Short Term Memory) Autoencoder** to learn the baseline behavior of a Formula 1 car and detects anomalies—whether caused by mechanical failure, sensor degradation, or malicious cyber-attacks—in real-time.
 
-## 2. Developer Acknowledgment
-This project was developed with the assistance of advanced Generative AI tools, like **Gemini** and **ChatGPT**. These tools were utilized to assist with complex mathematical calculations for the physics-based heuristics, optimize the React rendering loops, and polish the dashboard UI for a professional "race-day" aesthetic.
+---
 
-## 3. Tech Stack
+## Key Features (v2.5.0 Final)
 
-### Backend
-* **Framework**: FastAPI (Python)
-* **ML Engine**: TensorFlow / Keras (LSTM Autoencoder)
-* **Data Source**: FastF1 (Official F1 Timing & Telemetry)
-* **Data Processing**: Pandas, NumPy, Scikit-learn
+### 1. Active Defense: The "Red Team" Module
+A built-in adversarial testing suite to validate the AI's resilience.
+* **Sensor Jamming:** Simulates a "frozen" sensor attack (e.g., RPM stuck at 0).
+* **Signal Drift:** Injects gradual bias into throttle sensors to mimic calibration hacks.
+* **GPS Spoofing:** Teleports the vehicle coordinates to test geospatial integrity.
 
-### Frontend
-* **Framework**: React.js (v18+)
-* **Build Tool**: Vite
-* **Visualization**: Plotly.js (Real-time charts & Track Map)
-* **Styling**: CSS Modules (Carbon/Neon F1 aesthetic)
+### 2. Forensic Integrity: The "Black Box" Ledger
+A cryptographically secure chain of custody for evidence.
+* **Immutable Logging:** Every detected anomaly is hashed (SHA-256) and linked to the previous entry, creating a local blockchain.
+* **Evidence Receipts:** Automatically generates professional **PDF Forensic Reports** for every incident, ready for audit or stewards.
 
-## 4. Key Features (v2.0.0)
+### 3. Visual Intelligence: Broadcast-Grade Dashboard
+* **Live Sector Analysis:** Tracks vehicle performance against Session Bests (Purple) and Personal Bests (Green).
+* **Telemetry Heatmaps:** "Engineering Mode" visualizes speed and braking zones dynamically on the track map.
+* **Real-Time Gauges:** Analog-style visualization for Speed, RPM, Throttle, Brake, and Gear.
 
-### Advanced AI & Forensics (New in v2.0)
-* **Automated Event Classification**: The system uses physics-based heuristics to classify anomalies into specific categories:
-    * **Driver Lock-up**: Detected via brake pressure vs. deceleration deltas.
-    * **Traction Loss**: Detected via RPM spikes inconsistent with speed (wheel spin).
-    * **Sensor Failure**: Flags critical data dropouts (e.g., Speed > 100kph but RPM = 0).
-    * **DRS Faults**: Identifies unauthorized DRS activation outside designated zones.
-* **AI Interpretation**: Generates human-readable forensic reports explaining *why* an event was flagged (e.g., *"Detected sharp deceleration curve inconsistent with normal braking profile"*).
+---
 
-### Spatial Intelligence (New in v2.0)
-* **Live 2D Track Map**: Renders the circuit geometry using GPS data.
-* **Pinpoint Localization**: Plots the driver's live position (Yellow Marker) and exactly where anomalies occurred (Red 'X' Markers) on the track.
+## System Architecture
 
-### Core Capabilities
-* **LSTM Autoencoder**: Learns non-linear correlations between Speed, RPM, Throttle, Brake, Gear, and DRS.
-* **Dynamic Thresholding**: Automatically calculates deviation limits based on training reconstruction error (Mean + 3 StdDev).
-* **Real-Time Simulation**: Client-side loop plays back race data at 60Hz.
-* **Live Telemetry Gauges**: Analog-style visualization for critical car metrics.
+### The Brain (Backend)
+* **Engine:** Python / FastAPI
+* **AI Model:** TensorFlow Keras (LSTM Autoencoder)
+* **Data Processing:** Pandas, NumPy, Scikit-learn
+* **Source:** FastF1 API (Live Telemetry & GPS)
 
-## 5. The Blend of AI/ML and Cyber Security
-Apex Sentinel reframes a classic cybersecurity concept—the Intrusion Detection System (IDS)—for the physical world of high-performance engineering.
+### The Monitor (Frontend)
+* **Framework:** React.js (v19) + Vite
+* **Visualization:** Plotly.js (WebGL Maps & Charts)
+* **Performance:** 60Hz Client-Side Simulation Loop
 
-**Integrity Monitoring**: Just as an IDS flags malformed network packets, Apex Sentinel flags "malformed" physical data. A sensor sending static noise or a mechanical part failing mimics the signature of a cyber-attack on the vehicle's integrity.
+---
 
-**Context-Aware Defense**: Traditional rule-based systems ("Alert if RPM > 13k") create false positives. Apex Sentinel uses Deep Learning to understand context (e.g., High RPM is valid if Throttle is 100%, but invalid if Throttle is 0%). This is analogous to User and Entity Behavior Analytics (UEBA) in cyber defense.
+## Quick Start
 
-**Availability Assurance**: By detecting the early onset of mechanical stress (e.g., micro-vibrations or traction anomalies), the system acts as a safeguard for the vehicle's availability, preventing catastrophic failure before it occurs.
+### Prerequisites
+* Python 3.10+
+* Node.js 18+
 
-## 6. How to Start Apex Sentinel
+### 1. Backend Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-You will need two terminal windows running simultaneously (one for the Backend, one for the Frontend).
+# Run the data pipeline (Download 2023 Bahrain Data)
+python src/data_collection.py
 
-### Step 1: Backend Setup (Terminal 1)
+# Train the AI Model (Generates 'anomaly_detector.keras')
+python src/explore_data.py
+python src/train_model.py
 
-1.  **Install Python dependencies**:
-    ```bash
-    pip install -r requirements.txt
-    ```
+# Start the API Server
+uvicorn src.main:app --reload
+```
 
-2.  **Prepare the Data & Model**:
-    * Download telemetry (Default: 2023 Bahrain GP, PER):
-        ```bash
-        python src/data_collection.py
-        ```
-    * Preprocess and scale the data:
-        ```bash
-        python src/explore_data.py
-        ```
-    * Train the LTSM model:
-        ```bash
-        python src/train_model.py
-        ```
+### 2. Frontend Setup
+```bash
+cd apex-dashboard
+npm install
+npm run dev
+```
+Open http://localhost:5173 in the browser
 
-3.  **Start the API Server**:
-    ```bash
-    python src/main.py
-    ```
-    *The API will start at `http://0.0.0.0:8000`*
+## How to demonstrate the Security Engine
+### Scenario 1: "Dead Sensor" 
+* Load any Session and select a driver. Ex: **2023 Bahrain GP PER (Sergio Perez)**
+* Wait for Car to come to a position of your choice. Ex: Turn 1
+* Click **JAM RPM SENSOR** button in the sidebar (click once again to stop)
+* Obeservation: RPM drop to 0 but Speed stay high
+* After clicking on **RUN DIAGNOSTICS** click on **OPEN REPORT**
+* You must see **SENSOR DROPOUT** as a flagged Anomaly in the report
 
-### Step 2: Frontend Setup (Terminal 2)
-
-1.  **Navigate to the dashboard directory**:
-    ```bash
-    cd apex-dashboard
-    ```
-
-2.  **Install Node modules**:
-    ```bash
-    npm install
-    ```
-
-3.  **Start the React Dashboard**:
-    ```bash
-    npm run dev
-    ```
-
-4.  **Open the App**:
-    Visit the URL shown in the terminal (usually `http://localhost:5173`).
-
-**Usage Workflow**:
-1.  Click **LOAD DATA** to fetch the processed race data from the backend.
-2.  Click **PLAY** to start the real-time simulation.
-3.  Observe the **Live GPS** map and telemetry charts.
-4.  Click **RUN DIAGNOSTICS** to perform a batch forensic scan of the entire session and view the **Anomaly Report** panel.
-
-# Coming Soon: Apex Sentinel v2.5.0 (The Final Version)
-
-### From Passive Monitor to Active Security Engine
-
-**Apex Sentinel v2.5.0** marks the definitive evolution of this project. While previous versions focused on *observing* data to find anomalies, v2.5.0 transforms the system into a hardened **Cyber-Physical Security Engine**.
-
-The goal of this final release is to move beyond "finding errors" and focus on **proving resilience** and **guaranteeing integrity**. In the high-stakes world of motorsport and operational technology (OT), it is not enough to suspect a failure; you must be able to withstand an attack and prove your evidence is real.
-
-## The "Final" Features
-
-Version 2.5.0 introduces two critical pillars that bridge the gap between data science and cybersecurity: **Adversarial Validation** and **Forensic Integrity**.
-
-### 1. The "Red Team" Injection Module (Active Defense)
-* **The Challenge:** Passive systems are untested systems. Waiting for a natural failure does not prove the AI can catch a malicious actor.
-* **The Solution:** A built-in adversarial attack suite that allows users to inject synthetic hacks into the live telemetry stream.
-* **Capabilities:**
-    * **Signal Jamming:** Freezing sensor outputs (e.g., RPM) to test "dead sensor" logic.
-    * **Drift Injection:** Gradually biasing throttle inputs to mimic calibration hacks or mechanical degradation.
-    * **GPS Spoofing:** Altering coordinate data to test geospatial geofencing.
-* **The Goal:** To provide immediate, verifiable proof that the AI engine can detect specific attack vectors in milliseconds.
-
-### 2. "Black Box" Forensic Ledger (Integrity)
-* **The Challenge:** In any investigation—whether a race steward inquiry or a cyber incident response—logs are the first target for tampering. A mutable CSV file is not evidence; it is just a file.
-* **The Solution:** An immutable, cryptographic logging system.
-* **Capabilities:**
-    * **Event Hashing:** Every detected anomaly generates a unique SHA-256 hash fingerprint.
-    * **Secure Ledger:** These hashes are stored in a read-only "Black Box" file separate from the raw data.
-    * **Tamper Alerting:** If the post-session telemetry files do not match the hashes in the ledger, the system flags the dataset as compromised.
-* **The Goal:** To ensure **Non-Repudiation**. Once Apex Sentinel sees an event, that event becomes an unalterable part of the session history.
-
-## Roadmap to v2.5.0
-This release represents the completion of the Apex Sentinel:
-
-1.  **Detection (Completed in v2.0):** The system successfully identifies and classifies physical anomalies.
-2.  **Validation (Coming in v2.5):** The system proves it can catch intentional attacks.
-3.  **Integrity (Coming in v2.5):** The system protects its findings from human interference.
+### Scenario 2: "Evidence Tamper"
+* Create a session analysis (with any attacks, race and driver of your choice)
+* Open the **reports/evidence/** folder on your computer
+* Open the generated PDF Receipt
+**Verification**: Note the **SHA-256** Hash at the bottom. This hash matches the entry in reports/secure_ledger.json. Any modification to the log file breaks the chain
