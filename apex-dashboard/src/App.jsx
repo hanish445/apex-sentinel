@@ -23,13 +23,6 @@ const ATTACKS = {
 // Linear Interpolation Helper
 const lerp = (start, end, t) => start * (1 - t) + end * t;
 
-// Angle Interpolation (Handles 359->1 degree crossover)
-const lerpAngle = (a, b, t) => {
-    const da = (b - a) % 360;
-    const distance = 2 * da % 360 - da;
-    return a + distance * t;
-};
-
 function App() {
     const [view, setView] = useState('dashboard');
     const [config, setConfig] = useState({ year: 2023, gp: "Bahrain", sessionKey: "Race", driver: "PER" });
@@ -109,26 +102,34 @@ function App() {
         const deltaTime = time - lastFrameTimeRef.current;
         lastFrameTimeRef.current = time;
 
-        // Playback speed: 10 data points per second (approx)
-        // 10Hz data = 100ms per point.
-        // We want to advance floatIndex by (deltaTime / 100)
-        const speedFactor = 1.5; // Speed multiplier
+        const speedFactor = 1.5;
         const indexIncrement = (deltaTime / 100) * speedFactor;
 
         setFloatIndex(prev => {
             const nextIdx = prev + indexIncrement;
+
+            // [CRITICAL FIX] Detect if we crossed a new integer index
+            const prevFloor = Math.floor(prev);
+            const nextFloor = Math.floor(nextIdx);
 
             if (nextIdx >= simulationDataRef.current.length - 2) {
                 setIsRunning(false);
                 return prev;
             }
 
-            // Interpolation Logic
-            const idxFloor = Math.floor(nextIdx);
-            const t = nextIdx - idxFloor; // Fractional part (0.0 - 1.0)
+            // [CRITICAL FIX] "Poison" the data history EXACTLY ONCE per point
+            if (activeAttack && nextFloor > prevFloor) {
+                const targetPoint = simulationDataRef.current[nextFloor];
+                if (targetPoint) {
+                    // Overwrite the historical data point so the graph catches it
+                    simulationDataRef.current[nextFloor] = applyAttackVector(targetPoint);
+                }
+            }
 
-            const currData = simulationDataRef.current[idxFloor];
-            const nextData = simulationDataRef.current[idxFloor + 1];
+            // Interpolation Logic
+            const t = nextIdx - nextFloor; // Fractional part
+            const currData = simulationDataRef.current[nextFloor]; // Now potentially poisoned
+            const nextData = simulationDataRef.current[nextFloor + 1];
 
             if (currData && nextData) {
                 // Interpolate Metrics
@@ -137,14 +138,14 @@ function App() {
                     RPM: lerp(currData.RPM, nextData.RPM, t),
                     Throttle: lerp(currData.Throttle, nextData.Throttle, t),
                     Brake: lerp(currData.Brake, nextData.Brake, t),
-                    nGear: currData.nGear, // Gears don't interpolate
+                    nGear: currData.nGear,
                     DRS: currData.DRS,
                     Distance: lerp(currData.Distance, nextData.Distance, t),
                     X: lerp(currData.X, nextData.X, t),
                     Y: lerp(currData.Y, nextData.Y, t)
                 };
 
-                // Attack Injection
+                // Apply attack to the current interpolated frame too (for visual responsiveness)
                 const finalMetrics = applyAttackVector(interpolated);
                 setMetrics(finalMetrics);
 
@@ -167,7 +168,7 @@ function App() {
             cancelAnimationFrame(requestRef.current);
         }
         return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
-    }, [isRunning, dataLoaded, activeAttack]); // Re-bind if attack changes to apply immediately
+    }, [isRunning, dataLoaded, activeAttack]);
 
     const handleRunAnalysis = async () => {
         if (!simulationDataRef.current.length) return;
@@ -200,14 +201,13 @@ function App() {
     };
 
     // --- CHART DATA PREP ---
-    // We slice the history up to the floor index, then ADD the interpolated current point for smoothness
     const vizIndex = Math.floor(floatIndex);
     const vizData = simulationDataRef.current;
 
-    // Optimized chart data construction
     const getChartData = (field, color) => {
         if (!dataLoaded) return [];
         const historyX = Array.from({length: vizIndex}, (_, i) => i);
+        // The history now contains the "Poisoned" data because we modified simulationDataRef
         const historyY = vizData.slice(0, vizIndex).map(d => d[field]);
 
         // Add smooth tip
@@ -221,7 +221,6 @@ function App() {
         }];
     };
 
-    // Common Chart Layout
     const chartLayout = {
         autosize: true,
         margin: { t: 5, r: 10, l: 30, b: 20 },
