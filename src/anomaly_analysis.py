@@ -21,26 +21,30 @@ def classify_event(top_features, raw_snapshot):
     """
     feature_names = {f[0] for f in top_features}
 
-    # 1. LOCK-UP DETECTION
-    # Logic: High Brake error + High Speed error + Brake is active
+    # 1. SENSOR DROPOUT (CRITICAL)
+    # Logic: Car is moving fast (Speed > 100), but a critical sensor reads 0.
+    speed = raw_snapshot.get('Speed', 0)
+
+    if speed > 100:
+        # Check RPM
+        if raw_snapshot.get('RPM', 1) == 0:
+            return "SENSOR DROPOUT (RPM)", "System Critical"
+
+        # [FIXED] Check Throttle (Was missing in previous version)
+        # If Throttle is a top anomaly feature AND it reads 0 while moving fast
+        if 'Throttle' in feature_names and raw_snapshot.get('Throttle', 0) == 0:
+            return "SENSOR DROPOUT (THROTTLE)", "System Critical"
+
+    # 2. LOCK-UP DETECTION
+    # Logic: High Brake error + Speed error + Brake is active
     if 'Brake' in feature_names and 'Speed' in feature_names:
         if raw_snapshot.get('Brake', 0) > 50: # Hard braking
             return "DRIVER LOCK-UP", "Physical Event"
 
-    # 2. TRACTION LOSS / WHEEL SPIN
+    # 3. TRACTION LOSS / WHEEL SPIN
     # Logic: High RPM error + High Throttle error + Speed error
     if 'RPM' in feature_names and 'Throttle' in feature_names:
         return "TRACTION LOSS", "Physical Event"
-
-    # 3. SENSOR DROPOUT
-    # Logic: Any sensor reads exactly 0.0 while moving
-    # (Simplified check: if Speed > 100 but RPM is 0)
-    if raw_snapshot.get('Speed', 0) > 100:
-        if raw_snapshot.get('RPM', 1) == 0:
-            return "RPM SENSOR FAILURE", "System Critical"
-        if raw_snapshot.get('Throttle', 0) == 0 and 'Throttle' in feature_names:
-            # High throttle error but reading is 0? Suspicious.
-            pass
 
     # 4. DRS FAULT
     if 'DRS' in feature_names:
@@ -57,11 +61,10 @@ def generate_anomaly_explanation_text(anomaly_data: dict) -> str:
         return "Insufficient data for forensic analysis."
 
     seq_idx = anomaly_data['sequence_index']
-    end_idx = anomaly_data['end_index']
     rec_err = anomaly_data['reconstruction_error']
     threshold = anomaly_data['threshold']
     top_features = anomaly_data['top_features']
-    raw_snapshot = anomaly_data.get('raw_snapshot', {}) # New: Raw values for logic
+    raw_snapshot = anomaly_data.get('raw_snapshot', {})
 
     # --- Run Classification ---
     event_type, severity = classify_event(top_features, raw_snapshot)
@@ -79,7 +82,9 @@ def generate_anomaly_explanation_text(anomaly_data: dict) -> str:
     explanation += "\n**AI INTERPRETATION:**\n"
 
     # Contextual Summary
-    if event_type == "DRIVER LOCK-UP":
+    if "SENSOR DROPOUT" in event_type:
+        explanation += "CRITICAL FAILURE: Sensor reporting zero output while vehicle is at speed. Indicates wire harness failure, ECU disconnect, or signal jamming attack."
+    elif event_type == "DRIVER LOCK-UP":
         explanation += "Detected sharp deceleration curve inconsistent with normal braking profile. Likely front-tire lockup or threshold braking overshoot."
     elif event_type == "TRACTION LOSS":
         explanation += "Detected RPM spike without corresponding speed increase. Indicates rear wheel spin or gearbox/clutch slip event."
