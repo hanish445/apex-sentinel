@@ -8,7 +8,7 @@ import tensorflow as tf
 import pickle
 import os
 import json
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from data_collection import collect_telemetry_data
 from anomaly_analysis import generate_anomaly_explanation_text, classify_event
@@ -21,7 +21,7 @@ THRESHOLD_PATH = os.path.join('models', 'threshold.json')
 TIMESTEPS = 10
 MODEL_FEATURES = ['Speed', 'RPM', 'Throttle', 'Brake', 'nGear', 'DRS']
 
-app = FastAPI(title="F1 Anomaly Detection API v2.0", version="2.0.0")
+app = FastAPI(title="F1 Anomaly Detection API v2.5", version="2.5.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +51,7 @@ class TelemetryData(BaseModel):
     X: Optional[List[float]] = None
     Y: Optional[List[float]] = None
     Z: Optional[List[float]] = None
+    metadata: Optional[Dict[str, Any]] = {}
 
 class DataRequest(BaseModel):
     year: int
@@ -61,12 +62,18 @@ class DataRequest(BaseModel):
 @app.post("/load_data")
 def load_race_data(req: DataRequest):
     try:
-        df, error = collect_telemetry_data(req.year, req.gp, req.session, req.driver)
+        # Get dataframe AND sector info
+        df, error, sectors = collect_telemetry_data(req.year, req.gp, req.session, req.driver)
         if error: raise HTTPException(status_code=400, detail=error)
+
         if 'Brake' in df.columns and df['Brake'].dtype == 'bool':
             df['Brake'] = df['Brake'].astype(int)
         df = df.fillna(0)
-        return df.to_dict(orient="records")
+
+        return {
+            "telemetry": df.to_dict(orient="records"),
+            "sectors": sectors
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -76,6 +83,13 @@ def predict_anomaly(data: TelemetryData):
         return {"error": "Model not loaded"}
 
     input_dict = data.dict()
+
+    # [CRITICAL FIX] Remove metadata before Pandas conversion
+    meta_data = {}
+    if 'metadata' in input_dict:
+        meta_data = input_dict['metadata']
+        del input_dict['metadata']
+
     input_df = pd.DataFrame(input_dict)
 
     if not all(col in input_df.columns for col in MODEL_FEATURES):
@@ -103,10 +117,8 @@ def predict_anomaly(data: TelemetryData):
     sequence_end_indices = [i + TIMESTEPS - 1 for i in range(len(sequences))]
     top_features_list = []
     explanations_list = []
-
-    # [NEW] List to store the specific tags (e.g., "LOCK-UP", "SENSOR FAIL")
     classifications_list = []
-    forensics_receipts = []
+    forensic_receipts = []
 
     for i, seq_err in enumerate(per_feature_error):
         feat_map = {MODEL_FEATURES[j]: float(seq_err[j]) for j in range(len(MODEL_FEATURES))}
@@ -115,16 +127,15 @@ def predict_anomaly(data: TelemetryData):
         top_features_list.append(top_3)
 
         explanation = ""
-        tag = "NORMAL" # Default tag
+        tag = "NORMAL"
         receipt = None
 
         if anomalies[i]:
             end_idx = sequence_end_indices[i]
             raw_snapshot = model_df.iloc[end_idx].to_dict()
 
-            # 1. Run Classification Logic
             event_type, severity = classify_event(top_3, raw_snapshot)
-            tag = event_type # Store the tag (e.g. "DRIVER LOCK-UP")
+            tag = event_type
 
             report = {
                 "sequence_index": int(i),
@@ -136,9 +147,10 @@ def predict_anomaly(data: TelemetryData):
                 "classification": event_type,
                 "severity": severity
             }
-            event_id, event_hash, pdf_filename = log_to_ledger(report)
 
-            # Add security metadata to the explanation
+            # --- LEDGER COMMIT ---
+            event_id, event_hash, pdf_filename = log_to_ledger(report, meta_data)
+
             explanation = generate_anomaly_explanation_text(report)
             explanation += f"\n\n🔒 **CHAIN OF CUSTODY SECURED**\n"
             explanation += f"ID: {event_id}\n"
@@ -149,7 +161,7 @@ def predict_anomaly(data: TelemetryData):
 
         explanations_list.append(explanation)
         classifications_list.append(tag)
-        forensics_receipts.append(receipt)
+        forensic_receipts.append(receipt)
 
     return {
         "is_anomaly": anomalies.tolist(),
@@ -158,7 +170,8 @@ def predict_anomaly(data: TelemetryData):
         "sequence_end_indices": sequence_end_indices,
         "top_features": top_features_list,
         "explanations": explanations_list,
-        "classifications": classifications_list
+        "classifications": classifications_list,
+        "secure_receipts": forensic_receipts
     }
 
 if __name__ == "__main__":
