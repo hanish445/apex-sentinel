@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Plot from 'react-plotly.js';
 import TrackMap from './components/TrackMap';
 import Logo from './components/Logo.jsx';
 import './App.css';
 
-// --- CONFIGURATION ---
 const API_URL = "http://127.0.0.1:8000";
 const TIMESTEPS = 10;
 
@@ -14,39 +13,36 @@ const SESSION_OPTIONS = {
     'FP1': 'FP1', 'FP2': 'FP2', 'FP3': 'FP3'
 };
 
-// --- ATTACK VECTORS ---
 const ATTACKS = {
     NONE: null,
-    JAM_RPM: 'JAM_RPM',         // Integrity Attack: Freeze sensor
-    DRIFT_THROTTLE: 'DRIFT',    // Calibration Attack: Gradual bias
-    SPOOF_GPS: 'SPOOF_GPS'      // Geospatial Attack: Location hopping
+    JAM_RPM: 'JAM_RPM',
+    DRIFT_THROTTLE: 'DRIFT',
+    SPOOF_GPS: 'SPOOF_GPS'
 };
 
 function App() {
-    // --- STATE ---
     const [view, setView] = useState('dashboard');
     const [config, setConfig] = useState({ year: 2023, gp: "Bahrain", sessionKey: "Race", driver: "PER" });
 
-    // We use a Ref for the data being simulated/modified to avoid
-    // excessive re-renders while allowing mutable "data poisoning"
     const simulationDataRef = useRef([]);
+    const [sectorData, setSectorData] = useState(null);
     const [dataLoaded, setDataLoaded] = useState(false);
 
     const [currentIndex, setCurrentIndex] = useState(TIMESTEPS);
     const [isRunning, setIsRunning] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // RED TEAM STATE
     const [activeAttack, setActiveAttack] = useState(ATTACKS.NONE);
+    const [mapMode, setMapMode] = useState('broadcast');
 
     const [metrics, setMetrics] = useState({ Speed: 0, RPM: 0, nGear: 0, Throttle: 0, Brake: 0, DRS: 0 });
     const [analysisResults, setAnalysisResults] = useState(null);
     const [selectedAnomalyIndex, setSelectedAnomalyIndex] = useState(null);
 
-    // --- ACTIONS ---
     const handleClear = () => {
         setIsRunning(false);
         simulationDataRef.current = [];
+        setSectorData(null);
         setDataLoaded(false);
         setAnalysisResults(null);
         setSelectedAnomalyIndex(null);
@@ -59,14 +55,28 @@ function App() {
         handleClear();
         setLoading(true);
         try {
-            const payload = { ...config, session: SESSION_OPTIONS[config.sessionKey] };
+            const sessionCode = SESSION_OPTIONS[config.sessionKey];
+            const payload = { ...config, session: sessionCode };
+
             const res = await axios.post(`${API_URL}/load_data`, payload);
 
-            // Load data into the mutable Ref
-            simulationDataRef.current = res.data;
-            setDataLoaded(true);
-            setCurrentIndex(TIMESTEPS);
+            // [CRASH FIX] Validation check
+            if (res.data && Array.isArray(res.data.telemetry)) {
+                simulationDataRef.current = res.data.telemetry;
+                setSectorData(res.data.sectors);
+                setDataLoaded(true);
+                setCurrentIndex(TIMESTEPS);
+            } else if (Array.isArray(res.data)) {
+                // Fallback for old API format
+                simulationDataRef.current = res.data;
+                setDataLoaded(true);
+                setCurrentIndex(TIMESTEPS);
+            } else {
+                throw new Error("Invalid data format received from API");
+            }
+
         } catch (err) {
+            console.error(err);
             alert(`Error loading data: ${err.response?.data?.detail || err.message}`);
         } finally {
             setLoading(false);
@@ -77,8 +87,10 @@ function App() {
         if (!simulationDataRef.current.length) return;
         setLoading(true);
         try {
-            // Send the POISONED data (simulationDataRef) to the AI, not the original data
             const currentData = simulationDataRef.current;
+
+            // Send proper session name for metadata
+            const metaPayload = { ...config, session: config.sessionKey };
 
             const payload = {
                 Speed: currentData.map(d => d.Speed),
@@ -86,7 +98,8 @@ function App() {
                 Throttle: currentData.map(d => d.Throttle),
                 Brake: currentData.map(d => d.Brake),
                 nGear: currentData.map(d => d.nGear),
-                DRS: currentData.map(d => d.DRS)
+                DRS: currentData.map(d => d.DRS),
+                metadata: metaPayload
             };
 
             const res = await axios.post(`${API_URL}/predict`, payload);
@@ -108,65 +121,50 @@ function App() {
         }
     };
 
-    // --- RED TEAM ATTACK LOGIC ---
     const applyAttackVector = (dataPoint) => {
         if (!activeAttack) return dataPoint;
         let modifiedPoint = { ...dataPoint };
 
         switch (activeAttack) {
             case ATTACKS.JAM_RPM:
-                // SIMULATE: Sensor freezes or cuts out
                 modifiedPoint.RPM = 0;
                 break;
             case ATTACKS.DRIFT_THROTTLE:
-                // SIMULATE: Sensor calibration drift (+10% bias)
                 modifiedPoint.Throttle = Math.min(100, modifiedPoint.Throttle + 10);
                 break;
             case ATTACKS.SPOOF_GPS:
-                // SIMULATE: GPS offset (Teleport off-track)
                 modifiedPoint.X = modifiedPoint.X + 2000;
                 modifiedPoint.Y = modifiedPoint.Y + 2000;
                 break;
-            default:
-                break;
+            default: break;
         }
         return modifiedPoint;
     };
 
-    // --- SIMULATION LOOP ---
     useEffect(() => {
         let interval;
         if (isRunning && dataLoaded && currentIndex < simulationDataRef.current.length) {
             interval = setInterval(() => {
                 setCurrentIndex(prev => {
                     const nextIndex = prev + 1;
-
                     if (nextIndex >= simulationDataRef.current.length) {
                         setIsRunning(false);
                         return prev;
                     }
-
-                    // 1. Get original data
                     let currentPacket = simulationDataRef.current[nextIndex];
-
-                    // 2. Apply Active Attacks (Data Poisoning)
                     if (activeAttack) {
                         const poisonedPacket = applyAttackVector(currentPacket);
-                        // Persist the poison so the AI sees it later
                         simulationDataRef.current[nextIndex] = poisonedPacket;
                         currentPacket = poisonedPacket;
                     }
-
-                    // 3. Update Visuals
                     setMetrics(currentPacket);
                     return nextIndex;
                 });
-            }, 50); // 20Hz Update Rate
+            }, 50);
         }
         return () => clearInterval(interval);
     }, [isRunning, currentIndex, dataLoaded, activeAttack]);
 
-    // Helper for tag colors
     const getTagColor = (tag) => {
         if (!tag) return "#a1a1aa";
         if (tag.includes("LOCK-UP") || tag.includes("TRACTION")) return "#eab308";
@@ -185,21 +183,15 @@ function App() {
         font: { family: 'Inter', color: '#f8fafc' }
     });
 
-    // Extract visualization data from ref
     const vizData = simulationDataRef.current;
 
     return (
         <div className="app-container">
-
-            {/* SIDEBAR */}
             {view === 'dashboard' && (
                 <aside className="sidebar">
                     <div className="brand">
                         <Logo width={32} height={32} />
-                        <div>
-                            <span style={{color: '#fff'}}>APEX</span>
-                            <span style={{color: '#e10600'}}>SENTINEL</span>
-                        </div>
+                        <div><span style={{color: '#fff'}}>APEX</span><span style={{color: '#e10600'}}>SENTINEL</span></div>
                     </div>
 
                     <div className="control-section">
@@ -213,29 +205,16 @@ function App() {
                         <button className="btn btn-primary" onClick={handleLoadData} disabled={loading}>{loading ? "DOWNLOADING..." : "LOAD DATA"}</button>
                     </div>
 
-                    {/* RED TEAM MODULE */}
                     <div className="control-section" style={{borderTop: '1px solid #2d323b', paddingTop: '15px'}}>
                         <div className="section-label" style={{color: '#ef4444'}}>RED TEAM // INJECTION</div>
                         <div className="sim-controls" style={{flexDirection: 'column', gap: '8px'}}>
-                            <button
-                                className={`btn ${activeAttack === ATTACKS.JAM_RPM ? 'btn-primary' : 'btn-outline'}`}
-                                onClick={() => setActiveAttack(activeAttack === ATTACKS.JAM_RPM ? null : ATTACKS.JAM_RPM)}
-                                style={{fontSize: '11px', padding: '10px'}}
-                            >
+                            <button className={`btn ${activeAttack === ATTACKS.JAM_RPM ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveAttack(activeAttack === ATTACKS.JAM_RPM ? null : ATTACKS.JAM_RPM)} style={{fontSize: '11px', padding: '10px'}}>
                                 {activeAttack === ATTACKS.JAM_RPM ? '⚠ JAMMING RPM...' : 'JAM RPM SENSOR'}
                             </button>
-                            <button
-                                className={`btn ${activeAttack === ATTACKS.DRIFT_THROTTLE ? 'btn-primary' : 'btn-outline'}`}
-                                onClick={() => setActiveAttack(activeAttack === ATTACKS.DRIFT_THROTTLE ? null : ATTACKS.DRIFT_THROTTLE)}
-                                style={{fontSize: '11px', padding: '10px'}}
-                            >
+                            <button className={`btn ${activeAttack === ATTACKS.DRIFT_THROTTLE ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveAttack(activeAttack === ATTACKS.DRIFT_THROTTLE ? null : ATTACKS.DRIFT_THROTTLE)} style={{fontSize: '11px', padding: '10px'}}>
                                 {activeAttack === ATTACKS.DRIFT_THROTTLE ? '⚠ INJECTING BIAS...' : 'INJECT THROTTLE BIAS'}
                             </button>
-                            <button
-                                className={`btn ${activeAttack === ATTACKS.SPOOF_GPS ? 'btn-primary' : 'btn-outline'}`}
-                                onClick={() => setActiveAttack(activeAttack === ATTACKS.SPOOF_GPS ? null : ATTACKS.SPOOF_GPS)}
-                                style={{fontSize: '11px', padding: '10px'}}
-                            >
+                            <button className={`btn ${activeAttack === ATTACKS.SPOOF_GPS ? 'btn-primary' : 'btn-outline'}`} onClick={() => setActiveAttack(activeAttack === ATTACKS.SPOOF_GPS ? null : ATTACKS.SPOOF_GPS)} style={{fontSize: '11px', padding: '10px'}}>
                                 {activeAttack === ATTACKS.SPOOF_GPS ? '⚠ SPOOFING POS...' : 'SPOOF GPS SIGNAL'}
                             </button>
                         </div>
@@ -256,7 +235,6 @@ function App() {
                 </aside>
             )}
 
-            {/* MAIN CONTENT */}
             <main className="main-content">
                 {view === 'dashboard' ? (
                     <>
@@ -286,7 +264,11 @@ function App() {
 
                             <div className="main-stage">
                                 <div className="map-panel">
-                                    <TrackMap fullData={vizData} currentIndex={currentIndex} anomalies={analysisResults ? analysisResults.is_anomaly.map((isAnom, i) => isAnom ? analysisResults.sequence_end_indices[i] : null).filter(i => i !== null) : []} />
+                                    <TrackMap fullData={vizData} currentIndex={currentIndex} anomalies={analysisResults ? analysisResults.is_anomaly.map((isAnom, i) => isAnom ? analysisResults.sequence_end_indices[i] : null).filter(i => i !== null) : []} mapMode={mapMode} realSectors={sectorData} />
+                                    <div style={{position: 'absolute', bottom: '15px', right: '15px', display: 'flex', gap: '5px', zIndex: 10}}>
+                                        <button onClick={() => setMapMode('broadcast')} style={{background: mapMode === 'broadcast' ? '#a855f7' : 'rgba(0,0,0,0.5)', color: '#fff', border: '1px solid #3f3f46', padding: '6px 12px', fontSize: '10px', fontFamily: 'Rajdhani', fontWeight: 'bold', cursor: 'pointer'}}>TV MODE</button>
+                                        <button onClick={() => setMapMode('engineering')} style={{background: mapMode === 'engineering' ? '#00d2be' : 'rgba(0,0,0,0.5)', color: mapMode === 'engineering' ? '#000' : '#fff', border: '1px solid #3f3f46', padding: '6px 12px', fontSize: '10px', fontFamily: 'Rajdhani', fontWeight: 'bold', cursor: 'pointer'}}>ENG MODE</button>
+                                    </div>
                                 </div>
 
                                 <div className="telemetry-grid">
@@ -334,7 +316,6 @@ function App() {
                         </div>
                     </>
                 ) : (
-                    /* FORENSICS VIEW REMAINS SAME AS BEFORE, JUST LINKED TO analysisResults */
                     <div className="forensics-view">
                         <div className="forensics-sidebar">
                             <div className="list-header">
@@ -347,12 +328,7 @@ function App() {
                                         <div key={idx} className={`event-row ${selectedAnomalyIndex === idx ? 'active' : ''}`} onClick={() => setSelectedAnomalyIndex(idx)}>
                                             <div className="event-main">
                                                 <span>EVENT #{idx}</span>
-                                                <span style={{
-                                                    fontSize: '10px', padding: '2px 6px', borderRadius: '2px', fontWeight: '700',
-                                                    color: getTagColor(analysisResults.classifications?.[idx]),
-                                                    background: `${getTagColor(analysisResults.classifications?.[idx])}20`,
-                                                    border: `1px solid ${getTagColor(analysisResults.classifications?.[idx])}40`
-                                                }}>
+                                                <span style={{fontSize: '10px', padding: '2px 6px', borderRadius: '2px', fontWeight: '700', color: getTagColor(analysisResults.classifications?.[idx]), background: `${getTagColor(analysisResults.classifications?.[idx])}20`, border: `1px solid ${getTagColor(analysisResults.classifications?.[idx])}40`}}>
                                                     {analysisResults.classifications ? analysisResults.classifications[idx] : "ANOMALY"}
                                                 </span>
                                             </div>
