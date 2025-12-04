@@ -34,13 +34,13 @@ A cryptographically secure chain of custody for evidence.
 
 ## System Architecture
 
-### The Brain (Backend)
+### Backend
 * **Engine:** Python / FastAPI
 * **AI Model:** TensorFlow Keras (LSTM Autoencoder)
 * **Data Processing:** Pandas, NumPy, Scikit-learn
 * **Source:** FastF1 API (Live Telemetry & GPS)
 
-### The Monitor (Frontend)
+### Frontend
 * **Framework:** React.js (v19) + Vite
 * **Visualization:** Plotly.js (WebGL Maps & Charts)
 * **Performance:** 60Hz Client-Side Simulation Loop
